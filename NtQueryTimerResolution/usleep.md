@@ -17,9 +17,12 @@ Here, the implementation relies on a timer being triggered with &#x00B5;s resolu
 An overview of `usleep` calls during *.\microcontroller.exe* shows these results:
 
     PS C:\> $cdb = "${env:ProgramFiles(x86)}\Windows Kits\10\Debuggers\x64\cdb.exe";
-    PS C:\> $commands = "bp kernel32!SetWaitableTimer "".symopt- 4; .printf \""SetWaitableTimer %N\"", dwo(@rdx); .echo; gc""; g; q";
-    PS C:\> $output = & $cdb -c $commands .\microcontroller.exe
-    PS C:\> $output | Where {$_ -like "SetWaitableTimer *"} | Foreach { [int]("0x"+($_ -split " 0{8,8}")[1])/-10} | Group | Select Count, Name | Sort Count -Descending
+    PS C:\> $cods = "bp kernel32!SetWaitableTimer "".symopt- 4; 
+    .printf \""SetWaitableTimer %N\"", dwo(@rdx); .echo; gc""; g; q";
+    PS C:\> $output = & $cdb -c $cods .\microcontroller.exe
+    PS C:\> $output | Where {$_ -like "SetWaitableTimer *"} | 
+    Foreach { [int]("0x"+($_ -split " 0{8,8}")[1])/-10} | Group | 
+    Select Count, Name | Sort Count -Descending
     Count Name     
     ----- ----     
       334 5000  
@@ -109,7 +112,7 @@ Results on 3 different machines:
 |     6030 |     20005 |     15938 |
 
 
-On **Windows Server** box, the results are stable, with the clock being fired every *2 ms*. The results are close to **2 ms x 3** period. On **Windows 10** box, many results are close to the *10 ms* boundary. **MachineX**, the development box running 10 Home shows large fluctuations. *What causes these?*
+On *Windows Server* box, the results are stable, with the clock being fired every **2 ms**. The results are close to **2 ms x 3** period. On *Windows 10* box, many results are close to the **10 ms** boundary. **MachineX**, the development box running *10 Home* shows large fluctuations. *What causes these?*
 
 RE on NtSetTimerResolution
 ---
@@ -216,7 +219,9 @@ Program modified with NtQueryTimerResolution:
         count = usec * 10 / resolution;
         if (count) {
             ms = (DWORD)((count * resolution) / 10000);
-            Sleep(ms);
+            if (ms) {
+                Sleep(ms);
+            }
         }
         barrier = usec * scale;
         for (stop = start;
@@ -305,7 +310,9 @@ To export the values in CSV, select all entries in the **Process** column and th
 
 Once again, select all from *Line 2* to the end, `Ctrl+C` and paste into a CSV file.
 
-    PS C:\> Get-Clipboard | Where { $_ -like "*SystemTimeResolutionKernelChangeInternal*" } | Foreach { ($_ -split ",")[9] } | Group | Select Count, @{ Name = "Resolution"; Expression = { [int]$_.Name } } | Sort Count -Descending
+    PS C:\> Get-Clipboard | Where { $_ -like "*SystemTimeResolutionKernelChangeInternal*" } | 
+    Foreach { ($_ -split ",")[9] } | Group | Select Count, @{ Name = "Resolution"; 
+    Expression = { [int]$_.Name } } | Sort Count -Descending
 
     Count Resolution
     ----- ----------
@@ -339,10 +346,13 @@ Examples and Caveats
 ---
 Let's look at *DbgX.Shell.exe* and  *SuperDuperEdr* applications. The debugger calls the function when user types in the command line.
 
-    ModLoad: 00007ff6`4d400000 00007ff6`4d43a000   C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2308.2002.0_x64__8wekyb3d8bbwe\DbgX.Shell.exe
+    ModLoad: 00007ff6`4d400000 00007ff6`4d43a000   C:\Program Files\WindowsApps\Microsoft.
+    WinDbg_1.2308.2002.0_x64__8wekyb3d8bbwe\DbgX.Shell.exe
     ModLoad: 00007ffc`d37d0000 00007ffc`d39c8000   C:\WINDOWS\SYSTEM32\ntdll.dll
-    ModLoad: 00000186`e12b0000 00000186`e134c000   C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2308.2002.0_x64__8wekyb3d8bbwe\DbgX.Shell.dll
-    ModLoad: 00000186`df1e0000 00000186`df1ee000   C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2308.2002.0_x64__8wekyb3d8bbwe\System.Runtime.dll
+    ModLoad: 00000186`e12b0000 00000186`e134c000   C:\Program Files\WindowsApps\Microsoft.
+    WinDbg_1.2308.2002.0_x64__8wekyb3d8bbwe\DbgX.Shell.dll
+    ModLoad: 00000186`df1e0000 00000186`df1ee000   C:\Program Files\WindowsApps\Microsoft.
+    WinDbg_1.2308.2002.0_x64__8wekyb3d8bbwe\System.Runtime.dll
     
     0:022> bp ntdll!NtSetTimerResolution
     0:022> g
@@ -357,7 +367,8 @@ Let's look at *DbgX.Shell.exe* and  *SuperDuperEdr* applications. The debugger c
     # Child-SP          RetAddr               Call Site
     00 00000002`4897f7a8 00007ffc`d2e1dd6d     ntdll!NtSetTimerResolution
     01 00000002`4897f7b0 00007ffc`61ba4d7b     KERNEL32!timeBeginPeriod+0xcd
-    02 00000002`4897f7e0 00007ffc`61b94539     wpfgfx_cor3!CRenderTargetManager::EnableVBlankSync+0x5b [D:\a\_work\1\s\src\Microsoft.DotNet.Wpf\src\WpfGfx\core\uce\rendertargetmanager.cpp @ 967] 
+    02 00000002`4897f7e0 00007ffc`61b94539     wpfgfx_cor3!CRenderTargetManager::EnableVBlankSync
+    +0x5b 
     
 In this case, the timer resolution is set to 1 ms using `timeBeginPeriod` WinAPI. From the [MSDN documentation](https://learn.microsoft.com/en-us/windows/win32/api/timeapi/nf-timeapi-timebeginperiod):
 
@@ -370,7 +381,9 @@ To extract the events from cli, specify an *XPath* query as an alternative to th
     PS C:\> (Get-Item $PathToEtl).Length/1Mb;
     357
     PS C:\> $SuperDuperEdr = 1948
-    PS C:\> (Measure-Command { $a = Get-WinEvent -Path $PathToEtl -Oldest | Where { $_.Id -eq 557 -and $_.ProcessId -eq $SuperDuperEdr } | Select Message, TimeCreated }).TotalMinutes;
+    PS C:\> (Measure-Command { $a = Get-WinEvent -Path $PathToEtl -Oldest |
+    Where { $_.Id -eq 557 -and $_.ProcessId -eq $SuperDuperEdr } |
+    Select Message, TimeCreated }).TotalMinutes;
     94.3963127316667
 
 The query must follow the XML tree, displayed like this:
@@ -404,13 +417,16 @@ The query must follow the XML tree, displayed like this:
 
 Build the XPath:
 
-    PS C:\> $Xpath = "*[System[Provider[@Name=""Microsoft-Windows-Kernel-Power""]][EventID=557][Execution[@ProcessID=$SuperDuperEdr]]]"
+    PS C:\> $Xpath = "*[System[Provider[@Name=""Microsoft-Windows-Kernel-Power""]][EventID=557]
+    [Execution[@ProcessID=$SuperDuperEdr]]]"
 
 Launch the script:
 
-    PS C:\>  (Measure-Command { $a = Get-WinEvent -Path $PathToEtl -Oldest -FilterXPath $Xpath }).TotalSeconds
+    PS C:\> (Measure-Command { $a = Get-WinEvent -Path $PathToEtl -Oldest -FilterXPath $Xpath }).
+    TotalSeconds
     29.6164472
-    PS C:\> $a | Select @{ Name = "Time"; Expression = {"{0:O}" -f $_.TimeCreated} }, @{ Name = "Resolution (100 ns)"; Expression = {$_.Properties.Value[0]} }
+    PS C:\> $a | Select @{ Name = "Time"; Expression = {"{0:O}" -f $_.TimeCreated} }, 
+    @{ Name = "Resolution (100 ns)"; Expression = {$_.Properties.Value[0]} }
 
     Time                              Resolution (100 ns)
     ----                              -------------------
@@ -466,7 +482,8 @@ Tracking Resolution Changes in Realtime
     "@
     }
 
-    Register-NativeMethod "ntdll.dll" "int NtQueryTimerResolution(ref Int32 Max, ref Int32 Min, ref Int32 Current)"
+    Register-NativeMethod "ntdll.dll" "int NtQueryTimerResolution(ref Int32 Max, ref Int32 Min,
+    ref Int32 Current)"
     Add-NativeMethods
 
     [int]$min = 0;
@@ -519,8 +536,10 @@ The script divides the functions being disassembled on all but 1 cores, halving 
     57.755151805
     "C:\WINDOWS\System32\ntoskrnl.exe" has 17849 functions.
     Found 9 matches for KeTimeIncrement
-    ntoskrnl!ExQueryTimerResolution, ntoskrnl!ExSetTimerResolution, ntoskrnl!KeClockInterruptNotify, ntoskrnl!KeGetClockTimerResolution, ntoskrnl!KiSetClockIntervalToMinimumRequested, ntoskrnl!NtSetTimerResolution, ntoskrnl!PoExecutePerfCheck
-    PS C:\> del *.functions;
+    ntoskrnl!ExQueryTimerResolution, ntoskrnl!ExSetTimerResolution, 
+    ntoskrnl!KeClockInterruptNotify, ntoskrnl!KeGetClockTimerResolution, 
+    ntoskrnl!KiSetClockIntervalToMinimumRequested, ntoskrnl!NtSetTimerResolution, 
+    ntoskrnl!PoExecutePerfCheck
     PS C:\> (Measure-Command { .\search-symbol.ps1 -Symbol KeTimeIncrement -Single }).TotalMinutes;
     128.930202795
 
@@ -557,4 +576,4 @@ Conclusion
 - `usleep` can work within boundary as a combination of native `Sleep` and `QueryPerformanceCounter`. In production, the OS runs a few applications, with a diminished probability for deviations.
 - [timeBeginPeriod](https://learn.microsoft.com/en-us/windows/win32/api/timeapi/nf-timeapi-timebeginperiod) sets the resolution, [timeGetDevCaps](https://learn.microsoft.com/en-us/windows/win32/api/timeapi/nf-timeapi-timegetdevcaps) returns the *MinimumResolution, MaximumResolution*. The parameters are expressed in *milliseconds*.
 - Applications are not meant to retrieve the current resolution, given the concurrent adjustment.
-- Typical clock frequency is 100 Hz on Windows 10, 500 Hz on Windows Server.
+- Typical clock frequency is **100 Hz** on *Windows 10*, **500 Hz** on *Windows Server*.
