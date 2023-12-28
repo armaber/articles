@@ -112,7 +112,7 @@ Results on 3 different machines:
 |     6030 |     20005 |     15938 |
 
 
-On *Windows Server* box, the results are stable, with the clock being fired every **2 ms**. The results are close to **2 ms x 3** period. On *Windows 10* box, many results are close to the **10 ms** boundary. **MachineX**, the development box running *10 Home* shows large fluctuations. *What causes these?*
+On *Windows Server* box, the results are stable, with the clock being fired every **2 ms**. The results are close to **2 ms x 3** period. On *Windows 10* box, many results are near the **10 ms** boundary. **MachineX**, the development box running *10 Home* shows large fluctuations. *What causes it?*
 
 RE on NtSetTimerResolution
 ---
@@ -182,7 +182,7 @@ Disassembly shows only reads:
     fffff807`510deb59 c3              ret
 
 
-Program modified with NtQueryTimerResolution:
+Program with NtQueryTimerResolution:
 
     #include <windows.h>
     #include <stdlib.h>
@@ -422,8 +422,7 @@ Build the XPath:
 
 Launch the script:
 
-    PS C:\> (Measure-Command { $a = Get-WinEvent -Path $PathToEtl -Oldest -FilterXPath $Xpath }).
-    TotalSeconds
+    PS C:\> (Measure-Command { $a = Get-WinEvent -Path $PathToEtl -Oldest -FilterXPath $Xpath }).TotalSeconds
     29.6164472
     PS C:\> $a | Select @{ Name = "Time"; Expression = {"{0:O}" -f $_.TimeCreated} }, 
     @{ Name = "Resolution (100 ns)"; Expression = {$_.Properties.Value[0]} }
@@ -454,7 +453,7 @@ Launch the script:
     2023-12-24T15:00:03.3294125+02:00              100000
     2023-12-24T15:00:03.4387987+02:00              100000
 
-Tracking Resolution Changes in Realtime
+Tracking Resolution Changes
 ---
 
     PS C:\> Get-Content .\test.ps1
