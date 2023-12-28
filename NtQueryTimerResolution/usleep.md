@@ -346,13 +346,10 @@ Examples and Caveats
 ---
 Let's look at *DbgX.Shell.exe* and  *SuperDuperEdr* applications. The debugger calls the function when user types in the command line.
 
-    ModLoad: 00007ff6`4d400000 00007ff6`4d43a000   C:\Program Files\WindowsApps\Microsoft.
-    WinDbg_1.2308.2002.0_x64__8wekyb3d8bbwe\DbgX.Shell.exe
+    ModLoad: 00007ff6`4d400000 00007ff6`4d43a000   C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2308.2002.0_x64__8wekyb3d8bbwe\DbgX.Shell.exe
     ModLoad: 00007ffc`d37d0000 00007ffc`d39c8000   C:\WINDOWS\SYSTEM32\ntdll.dll
-    ModLoad: 00000186`e12b0000 00000186`e134c000   C:\Program Files\WindowsApps\Microsoft.
-    WinDbg_1.2308.2002.0_x64__8wekyb3d8bbwe\DbgX.Shell.dll
-    ModLoad: 00000186`df1e0000 00000186`df1ee000   C:\Program Files\WindowsApps\Microsoft.
-    WinDbg_1.2308.2002.0_x64__8wekyb3d8bbwe\System.Runtime.dll
+    ModLoad: 00000186`e12b0000 00000186`e134c000   C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2308.2002.0_x64__8wekyb3d8bbwe\DbgX.Shell.dll
+    ModLoad: 00000186`df1e0000 00000186`df1ee000   C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2308.2002.0_x64__8wekyb3d8bbwe\System.Runtime.dll
     
     0:022> bp ntdll!NtSetTimerResolution
     0:022> g
@@ -372,7 +369,10 @@ Let's look at *DbgX.Shell.exe* and  *SuperDuperEdr* applications. The debugger c
     
 In this case, the timer resolution is set to 1 ms using `timeBeginPeriod` WinAPI. From the [MSDN documentation](https://learn.microsoft.com/en-us/windows/win32/api/timeapi/nf-timeapi-timebeginperiod):
 
-    Setting a higher resolution can improve the accuracy of time-out intervals in wait functions. However, it can also reduce overall system performance, because the thread scheduler switches tasks more often. High resolutions can also prevent the CPU power management system from entering power-saving modes. Setting a higher resolution does not improve the accuracy of the high-resolution performance counter.
+    Setting a higher resolution can improve the accuracy of time-out intervals in wait functions. However, it can also 
+    reduce overall system performance, because the thread scheduler switches tasks more often. High resolutions can also
+    prevent the CPU power management system from entering power-saving modes. Setting a higher resolution does not improve
+    the accuracy of the high-resolution performance counter.
 
 *SuperDuperEdr.exe* makes heavy use of the *500 &#x00B5;s* timer. Based on *strings.exe* tool, the application is written in *Go*.
 
@@ -555,7 +555,11 @@ One of the matches:
 
 A Google search for `KeGetClockTimerResolution` led to this [MSDN article](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/high-resolution-timers).
 
-    To avoid unnecessarily increasing power consumption, the operating system runs the system clock at its maximum rate only when necessary to satisfy the timing requirements of high-resolution timers. For example, if a high-resolution timer is periodic, and its period spans several default system clock ticks, the operating system might run the system clock at its maximum rate only in the part of the timer period that immediately precedes each expiration. For the rest of the timer period, the system clock runs at its default rate.
+    To avoid unnecessarily increasing power consumption, the operating system runs the system clock at its maximum rate
+    only when necessary to satisfy the timing requirements of high-resolution timers. For example, if a high-resolution 
+    timer is periodic, and its period spans several default system clock ticks, the operating system might run the system 
+    clock at its maximum rate only in the part of the timer period that immediately precedes each expiration. For the rest 
+    of the timer period, the system clock runs at its default rate.
 
 
 DRIVER_VERIFIER_DMA_VIOLATION 
