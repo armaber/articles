@@ -17,12 +17,11 @@ Here, the implementation relies on a timer being triggered with &#x00B5;s resolu
 An overview of `usleep` calls during *.\microcontroller.exe* shows these results:
 
     PS C:\> $cdb = "${env:ProgramFiles(x86)}\Windows Kits\10\Debuggers\x64\cdb.exe";
-    PS C:\> $cods = "bp kernel32!SetWaitableTimer "".symopt- 4; 
-    .printf \""SetWaitableTimer %N\"", dwo(@rdx); .echo; gc""; g; q";
+    PS C:\> $cods = "bp kernel32!SetWaitableTimer "".symopt- 4; .printf \""SetWaitableTimer %N\"", dwo(@rdx); .echo; gc""; g; q";
     PS C:\> $output = & $cdb -c $cods .\microcontroller.exe
-    PS C:\> $output | Where {$_ -like "SetWaitableTimer *"} | 
-    Foreach { [int]("0x"+($_ -split " 0{8,8}")[1])/-10} | Group | 
-    Select Count, Name | Sort Count -Descending
+    PS C:\> $output | Where {$_ -like "SetWaitableTimer *"} | Foreach {
+                [int]("0x"+($_ -split " 0{8,8}")[1])/-10
+            } | Group | Select Count, Name | Sort Count -Descending;
     Count Name     
     ----- ----     
       334 5000  
@@ -32,17 +31,20 @@ An overview of `usleep` calls during *.\microcontroller.exe* shows these results
         4 1000  
         1 200   
 
-With **cdb.exe**, a breakpoint is placed on `SetWaitableTimer` and the 2nd argument is printed. The output is parsed, value divided by -10 to obtain the original &#x00B5;s argument.
+With **cdb.exe**, a breakpoint is placed on `SetWaitableTimer` and the 2nd argument is printed.
+The output is parsed, value divided by -10 to obtain the original &#x00B5;s argument.
 
 **329** calls for usleep of **130 ms** are made. `usleep(130000)` can be located in the source.
 
-Many arguments are a multiple of 1 millisecond. The OS clock runs on a multiple of ms as well, so the deviation is small.
-On a hot-path containing `usleep(< 1000)`, the compound deviation expands substantially.
+Many arguments are a multiple of 1 millisecond. The OS clock runs on a multiple of ms as well,
+so the deviation is small. On a hot-path containing `usleep(< 1000)`, the compound deviation
+expands substantially.
 
 Experiment
 ---
 
-On some platforms, the clock runs at 64 Hz, for a timespan of 156250 100-nanoseconds. Triggering a *WaitableTimer* after 5 milliseconds is done at clock boundary.
+On some platforms, the clock runs at 64 Hz, for a timespan of 156250 100-nanoseconds. Triggering
+a *WaitableTimer* after 5 milliseconds is done at clock boundary.
 
     #pragma comment(lib, "ntdll.lib")
     __declspec(dllimport) DWORD WINAPI NtSetTimerResolution(DWORD DesiredResolution,
@@ -112,12 +114,17 @@ Results on 3 different machines:
 |     6030 |     20005 |     15938 |
 
 
-On *Windows Server* box, the results are stable, with the clock being fired every **2 ms**. The results are close to **2 ms x 3** period. On *Windows 10* box, many results are near the **10 ms** boundary. **MachineX**, the development box running *10 Home* shows large fluctuations. *What causes it?*
+On *Windows Server* box, the results are stable, with the clock being fired every **2 ms**.
+The results are close to **2 ms x 3** period. On *Windows 10* box, many results are near
+the **10 ms** boundary. **MachineX**, the development box running *10 Home* shows large
+fluctuations. *What causes it?*
 
 RE on NtSetTimerResolution
 ---
 
-In the past, a microbenchmark jitter was reported from the field. Since it did not replicate in the lab, regression testing was done by increasing the clock frequency using this undocumented function.
+In the past, a microbenchmark jitter was reported from the field. Since it did not replicate
+in the lab, regression testing was done by increasing the clock frequency using this 
+undocumented function.
 
 Let's open a memory file and look at the implementation:
 
@@ -142,7 +149,10 @@ Let's open a memory file and look at the implementation:
     ...
     fffff807`5122c1a3 e808af1800      call    nt!ExFreePool (fffff807`513b70b0)
 
-Though the timer resolution is read in the experiment, **ExpTimerRefreshLock is acquired**. The call to **PoTraceSystemTimerResolution** indicates an [ETW](https://learn.microsoft.com/en-us/windows/win32/etw/event-tracing-portal) probe. We can use *xperf* or *Performance Recorder* to detect applications ending here.
+Though the timer resolution is read in the experiment, **ExpTimerRefreshLock is acquired**. The call 
+to **PoTraceSystemTimerResolution** indicates an 
+[ETW](https://learn.microsoft.com/en-us/windows/win32/etw/event-tracing-portal) probe. We can use 
+*xperf* or *Performance Recorder* to detect applications ending here.
 
 The alternative shows many hits:
 
@@ -153,8 +163,10 @@ The alternative shows many hits:
 
 Plan
 ---
-- On stable systems, the *WaitableTimer* is triggered at resolution boundary. It does not have &#x00B5;s granularity.
-- Implement and verify `usleep` as combination of `Sleep` and *CPU spin* for the remaining time. `Sleep` argument is a multiple of the resolution.
+- On stable systems, the *WaitableTimer* is triggered at resolution boundary. It does not have
+&#x00B5;s granularity.
+- Implement and verify `usleep` as combination of `Sleep` and *CPU spin* for the remaining time.
+`Sleep` argument is a multiple of the resolution.
 - Identify a lightweight replacement for `NtSetTimerResolution`.
 - Determine which processes adjust the clock resolution.
 
@@ -296,13 +308,13 @@ ETL Analysis
 - A provider has to be enabled to become part of the trace. 
 - After the trace is stopped, the resulting **.etl** log file is analyzed.
 
-Install the latest *Assesment and Deployment Kit*, as advised on [ETW Trace Processing Fails with Error Code 0x80070032
-](https://devblogs.microsoft.com/performance-diagnostics/etw-trace-processing-fails-with-error-code-0x80070032/).
+Install the latest *Assesment and Deployment Kit*, as advised on [ETW Trace Processing Fails with Error Code 0x80070032](https://devblogs.microsoft.com/performance-diagnostics/etw-trace-processing-fails-with-error-code-0x80070032/).
 
 Launch *"C:\Program Files (x86)\Windows Kits\10\Windows Performance Toolkit\WPRUI.exe"*
 and specify only **Power** in the *Resource Analysis* tree. Press *Start*, leave it for 10 seconds, *Stop*, *Save* and *Lauch WPA*.
 
-On the *"Performance Analyzer"* GUI, look for *Generic Events*, expand *Microsoft-Windows-Kernel-Power*, select *SystemTimeResolutionKernelChangeInternal*, right click, *Filter to selection*.
+On the *"Performance Analyzer"* GUI, look for *Generic Events*, expand *Microsoft-Windows-Kernel-Power*,
+select *SystemTimeResolutionKernelChangeInternal*, right click, *Filter to selection*.
 
 To export the values in CSV, select all entries in the **Process** column and then right-click, *Expand*.
 
@@ -311,8 +323,8 @@ To export the values in CSV, select all entries in the **Process** column and th
 Once again, select all from *Line 2* to the end, `Ctrl+C` and paste into a CSV file.
 
     PS C:\> Get-Clipboard | Where { $_ -like "*SystemTimeResolutionKernelChangeInternal*" } | 
-    Foreach { ($_ -split ",")[9] } | Group | Select Count, @{ Name = "Resolution"; 
-    Expression = { [int]$_.Name } } | Sort Count -Descending
+            Foreach { ($_ -split ",")[9] } | Group | Select Count, 
+            @{ Name = "Resolution"; Expression = { [int]$_.Name } } | Sort Count -Descending
 
     Count Resolution
     ----- ----------
@@ -337,14 +349,31 @@ Once again, select all from *Line 2* to the end, `Ctrl+C` and paste into a CSV f
         9      95000
         5     100000
 
-Within 10 seconds, out of **2174 calls** that modify the timer's resolution,  **177** request **500 &#x00B5;s** interval. Among those:
-*Winword.exe, WindowsTerminal.exe, Thunderbird.exe, TeamViewer_Service.exe, System, pwsh.exe, PhoneExperienceHost.exe, MsMpEng.exe, msedge.exe, SuperDuperEdr.exe*.
+Within 10 seconds, out of **2174 calls** that modify the timer's resolution,  **177** request 
+**500 &#x00B5;s** interval. Among those: *Winword.exe, WindowsTerminal.exe, Thunderbird.exe, 
+TeamViewer_Service.exe, System, pwsh.exe, PhoneExperienceHost.exe, MsMpEng.exe, msedge.exe,
+SuperDuperEdr.exe*.
 
 The calls for a **10 ms** resolution belong to the *Idle* process.
 
+Generating the **.etl** from cli requires elevation:
+
+    PS C:\> $wpr = "${env:ProgramFiles(x86)\Windows Kits\10\Windows Performance Toolkit\wpr.exe";
+    PS C:\> & $wpr -start Power;
+    PS C:\> Start-Sleep -Seconds 10;
+    PS C:\> & $wpr -stop $PathToEtl;
+    Press Ctrl+C to cancel the stop operation.
+    100%  [>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>]
+    The trace was successfully saved.
+
+- `xperf.exe -on PROC_THREAD+LOADER+PROFILE+POWER` did not capture **EventID 557**.
+- EventID **557** is not documented. It is part of the tuple where 
+  `SystemTimeResolutionKernelChangeInternal` resides, in the *"Performance Analyzer"* GUI.
+
 Examples and Caveats
 ---
-Let's look at *DbgX.Shell.exe* and  *SuperDuperEdr* applications. The debugger calls the function when user types in the command line.
+Let's look at *DbgX.Shell.exe* and  *SuperDuperEdr* applications. The debugger calls the function
+when user types in the command line.
 
     ModLoad: 00007ff6`4d400000 00007ff6`4d43a000   C:\Program Files\WindowsApps\Microsoft.WinDbg_1.2308.2002.0_x64__8wekyb3d8bbwe\DbgX.Shell.exe
     ModLoad: 00007ffc`d37d0000 00007ffc`d39c8000   C:\WINDOWS\SYSTEM32\ntdll.dll
@@ -367,65 +396,74 @@ Let's look at *DbgX.Shell.exe* and  *SuperDuperEdr* applications. The debugger c
     02 00000002`4897f7e0 00007ffc`61b94539     wpfgfx_cor3!CRenderTargetManager::EnableVBlankSync
     +0x5b 
     
-In this case, the timer resolution is set to 1 ms using `timeBeginPeriod` WinAPI. From the [MSDN documentation](https://learn.microsoft.com/en-us/windows/win32/api/timeapi/nf-timeapi-timebeginperiod):
+In this case, the timer resolution is set to 1 ms using `timeBeginPeriod` WinAPI. From the 
+[MSDN documentation](https://learn.microsoft.com/en-us/windows/win32/api/timeapi/nf-timeapi-timebeginperiod):
 
-    Setting a higher resolution can improve the accuracy of time-out intervals in wait functions. However, it can also 
-    reduce overall system performance, because the thread scheduler switches tasks more often. High resolutions can also
-    prevent the CPU power management system from entering power-saving modes. Setting a higher resolution does not improve
-    the accuracy of the high-resolution performance counter.
+> Setting a higher resolution can improve the accuracy of time-out intervals in wait functions. However, it can also 
+> reduce overall system performance, because the thread scheduler switches tasks more often. High resolutions can also
+> prevent the CPU power management system from entering power-saving modes. Setting a higher resolution does not improve
+> the accuracy of the high-resolution performance counter.
 
-*SuperDuperEdr.exe* makes heavy use of the *500 &#x00B5;s* timer. Based on *strings.exe* tool, the application is written in *Go*.
+*SuperDuperEdr.exe* makes heavy use of the *500 &#x00B5;s* timer. Based on *strings.exe* tool,
+the application is written in *Go*.
 
-To extract the events from cli, specify an *XPath* query as an alternative to the **94 minutes** direct approach:
+To extract the events from cli, specify an *XPath* query as an alternative to the **94 minutes**
+direct approach:
 
     PS C:\> (Get-Item $PathToEtl).Length/1Mb;
     357
-    PS C:\> $SuperDuperEdr = 1948
-    PS C:\> (Measure-Command { $a = Get-WinEvent -Path $PathToEtl -Oldest |
-    Where { $_.Id -eq 557 -and $_.ProcessId -eq $SuperDuperEdr } |
-    Select Message, TimeCreated }).TotalMinutes;
+    PS C:\> $SuperDuperEdr = 1948;
+    PS C:\> (Measure-Command { $a = Get-WinEvent -Path $PathToEtl -Oldest | Where {
+                $_.Id -eq 557 -and $_.ProcessId -eq $SuperDuperEdr 
+            } | Select Message, TimeCreated }).TotalMinutes;
     94.3963127316667
 
 The query must follow the XML tree, displayed like this:
 
-    PS C:\> $xml = (Get-WinEvent $PathToEtl -Oldest | Select -First 1).ToXml()
-    PS C:\> $xml.Replace(">",">`n").Replace("</", "`n</")
-    <Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'>
-    <System>
-    <Provider Name='' Guid='{68fdd900-4a3e-11d1-84f4-0000f80464e3}'/>
-    <EventID>
-    0
-    </EventID>
-    ...
-    <Keywords>
-    0x0
-    </Keywords>
-    <TimeCreated SystemTime='2023-12-24T12:59:52.3688575Z'/>
-    <EventRecordID>
-    0
-    </EventRecordID>
-    <Correlation/>
-    <Execution ProcessID='18668' ThreadID='2140'/>
-    <Computer>
-    MachineX
-    </Computer>
-    <Security/>
+    PS C:\> $xml = (Get-WinEvent $PathToEtl -Oldest | Select -First 1).ToXml();
+    PS C:\> function prettify {
+        param([string]$x)
 
-    </System>
+        $y = $x.Replace(">",">`n").Replace("</", "`n</") -split "`n";
+        $y | foreach {
+            if ($_ -like "</*") { 
+                $i --; (" "*4*$i + $_);
+            } elseif ($_ -like "*>" -and $_ -notlike "*/>") {
+                (" "*4*$i + $_); $i ++;
+            } else { 
+                (" "*4*$i + $_);
+            } 
+        }
+    }
+    PS C:\> prettify $xml;
+    <Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'>
+        <System>
+            <Provider Name='' Guid='{68fdd900-4a3e-11d1-84f4-0000f80464e3}'/>
+            <EventID>
+                0
+            </EventID>
+    ...
+            <TimeCreated SystemTime='2023-12-24T12:59:52.3688575Z'/>
+            <Execution ProcessID='18668' ThreadID='2140'/>
+            <Computer>
+                MachineX
+            </Computer>
+    ...
+        </System>
     ...
     </Event>
 
 Build the XPath:
 
     PS C:\> $Xpath = "*[System[Provider[@Name=""Microsoft-Windows-Kernel-Power""]][EventID=557]
-    [Execution[@ProcessID=$SuperDuperEdr]]]"
+                      [Execution[@ProcessID=$SuperDuperEdr]]]";
 
 Launch the script:
 
     PS C:\> (Measure-Command { $a = Get-WinEvent -Path $PathToEtl -Oldest -FilterXPath $Xpath }).TotalSeconds
     29.6164472
     PS C:\> $a | Select @{ Name = "Time"; Expression = {"{0:O}" -f $_.TimeCreated} }, 
-    @{ Name = "Resolution (100 ns)"; Expression = {$_.Properties.Value[0]} }
+            @{ Name = "Resolution (100 ns)"; Expression = {$_.Properties.Value[0]} }
 
     Time                              Resolution (100 ns)
     ----                              -------------------
@@ -452,6 +490,22 @@ Launch the script:
     2023-12-24T15:00:02.6731373+02:00               55000
     2023-12-24T15:00:03.3294125+02:00              100000
     2023-12-24T15:00:03.4387987+02:00              100000
+
+A readable XPath query can substitute *EventID 557*:
+
+    PS C:\> prettify $a[0].ToXml();
+    ...
+        <EventData>
+        <Data Name='RequestedResolution'>
+            5000
+        </Data>
+        <Data Name='Tag'>
+            1397707336
+        </Data>
+
+    </EventData>
+    PS C:\> (Get-WinEvent -Path $PathToEtl -Oldest -FilterXPath "*[EventData[Data[@Name=""RequestedResolution""]]]").Count
+    2174
 
 Tracking Resolution Changes
 ---
@@ -525,14 +579,17 @@ On **MachineX**, the frequency changes are shown:
 Lateral Exploration
 ---
 
-A standalone tool that searches for a symbol, as in `mov     edi,dword ptr [nt!KeTimeIncrement]`, can be built in a 2-pass:
+A standalone tool that searches for a symbol, as in `mov     edi,dword ptr [nt!KeTimeIncrement]`, 
+can be built in a 2-pass:
 - disassemble the binary, either the current kernel or a memory file
 - establish the function perimeter
 
-The script divides the functions being disassembled on all but 1 cores, halving the time spent.
+The script divides the functions being disassembled on all but 1 cores, halving the time
+spent.
 
-    PS C:\> (Measure-Command { $a = .\search-symbol.ps1 -Symbol KeTimeIncrement }).TotalMinutes; $a;
+    PS C:\> (Measure-Command { $a = .\search-symbol.ps1 -Symbol KeTimeIncrement }).TotalMinutes;
     57.755151805
+    PS C:\> $a;
     "C:\WINDOWS\System32\ntoskrnl.exe" has 17849 functions.
     Found 9 matches for KeTimeIncrement
     ntoskrnl!ExQueryTimerResolution, ntoskrnl!ExSetTimerResolution, 
@@ -554,16 +611,18 @@ One of the matches:
 
 A Google search for `KeGetClockTimerResolution` led to this [MSDN article](https://learn.microsoft.com/en-us/windows-hardware/drivers/kernel/high-resolution-timers).
 
-    To avoid unnecessarily increasing power consumption, the operating system runs the system clock at its maximum rate
-    only when necessary to satisfy the timing requirements of high-resolution timers. For example, if a high-resolution 
-    timer is periodic, and its period spans several default system clock ticks, the operating system might run the system 
-    clock at its maximum rate only in the part of the timer period that immediately precedes each expiration. For the rest 
-    of the timer period, the system clock runs at its default rate.
+> To avoid unnecessarily increasing power consumption, the operating system runs the system clock at its maximum rate
+> only when necessary to satisfy the timing requirements of high-resolution timers. For example, if a high-resolution 
+> timer is periodic, and its period spans several default system clock ticks, the operating system might run the system 
+> clock at its maximum rate only in the part of the timer period that immediately precedes each expiration. For the rest 
+> of the timer period, the system clock runs at its default rate.
 
 
 DRIVER_VERIFIER_DMA_VIOLATION 
 ---
-In the absence of a stack trace, the script can reveal the callers and reconstruct the failure. On a separate root cause analysis, `IvtHandleInterrupt` raised [this](https://learn.microsoft.com/en-us/troubleshoot/windows-server/performance/stop-code-driver-verifier-dma-violation) **BSOD**:
+In the absence of a stack trace, the script can reveal the callers and reconstruct the failure.
+On a separate root cause analysis, `IvtHandleInterrupt` raised [this](https://learn.microsoft.com/en-us/troubleshoot/windows-server/performance/stop-code-driver-verifier-dma-violation)
+**BSOD**:
 
     PS C:\> .\search-symbol.ps1 -Symbol ntoskrnl!IvtHandleInterrupt
     Found 51 matches for ntoskrnl!IvtHandleInterrupt
@@ -574,9 +633,17 @@ In the absence of a stack trace, the script can reveal the callers and reconstru
 
 Conclusion
 ---
-- *Thread Quantum* = *Timer Resolution* is adjusted by *Idle, SuperDuperEdr, MemCompression, MsMpEng, SearchIndexer, wermgr* and many other processes. **Idle, MemCompression, inbox anti-malware, wermgr** are active in every installation.
+- *Thread Quantum* = *Timer Resolution* is adjusted by *Idle, SuperDuperEdr, MemCompression,
+MsMpEng, SearchIndexer, wermgr* and many other processes. **Idle, MemCompression, inbox
+anti-malware, wermgr** are active in every installation.
 - The OS can split a sporadic timer request to fit best into CPU power states.
-- `usleep` can work within boundary as a combination of native `Sleep` and `QueryPerformanceCounter`. In production, the OS runs a few applications, with a diminished probability for deviations.
-- [timeBeginPeriod](https://learn.microsoft.com/en-us/windows/win32/api/timeapi/nf-timeapi-timebeginperiod) sets the resolution, [timeGetDevCaps](https://learn.microsoft.com/en-us/windows/win32/api/timeapi/nf-timeapi-timegetdevcaps) returns the *MinimumResolution, MaximumResolution*. The parameters are expressed in *milliseconds*.
+- `usleep` can work within boundary as a combination of native `Sleep` and 
+`QueryPerformanceCounter`. In production, the OS runs a few applications, with a diminished
+probability for deviations.
+- [timeBeginPeriod](https://learn.microsoft.com/en-us/windows/win32/api/timeapi/nf-timeapi-timebeginperiod)
+sets the resolution, [timeGetDevCaps](https://learn.microsoft.com/en-us/windows/win32/api/timeapi/nf-timeapi-timegetdevcaps)
+returns the *MinimumResolution, MaximumResolution*. The parameters are expressed in *milliseconds*.
 - Applications are not meant to retrieve the current resolution, given the concurrent adjustment.
-- Typical clock frequency is **100 Hz** on *Windows 10*, **500 Hz** on *Windows Server*.
+- Timing deviations can be analyzed with `wpr` **Power** profiling . Use *XPath*
+to extract events from **.etl** file.
+- Typical clock frequency on *Windows 10* is **100 Hz**, *Windows Server* runs at **500 Hz**.
