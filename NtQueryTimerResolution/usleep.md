@@ -356,7 +356,7 @@ SuperDuperEdr.exe*.
 
 The calls for a **10 ms** resolution belong to the *Idle* process.
 
-Generating the **.etl** from cli requires elevation:
+Generating the *.etl* from cli requires elevation:
 
     PS C:\> $wpr = "${env:ProgramFiles(x86)\Windows Kits\10\Windows Performance Toolkit\wpr.exe";
     PS C:\> & $wpr -start Power;
@@ -393,8 +393,7 @@ when user types in the command line.
     # Child-SP          RetAddr               Call Site
     00 00000002`4897f7a8 00007ffc`d2e1dd6d     ntdll!NtSetTimerResolution
     01 00000002`4897f7b0 00007ffc`61ba4d7b     KERNEL32!timeBeginPeriod+0xcd
-    02 00000002`4897f7e0 00007ffc`61b94539     wpfgfx_cor3!CRenderTargetManager::EnableVBlankSync
-    +0x5b 
+    02 00000002`4897f7e0 00007ffc`61b94539     wpfgfx_cor3!CRenderTargetManager::EnableVBlankSync+0x5b 
     
 In this case, the timer resolution is set to 1 ms using `timeBeginPeriod` WinAPI. From the 
 [MSDN documentation](https://learn.microsoft.com/en-us/windows/win32/api/timeapi/nf-timeapi-timebeginperiod):
@@ -407,8 +406,8 @@ In this case, the timer resolution is set to 1 ms using `timeBeginPeriod` WinAPI
 *SuperDuperEdr.exe* makes heavy use of the *500 &#x00B5;s* timer. Based on *strings.exe* tool,
 the application is written in *Go*.
 
-To extract the events from cli, specify an *XPath* query as an alternative to the **94 minutes**
-direct approach:
+More than **3e+6** events are stored in the *.etl* file. Extracting them with a high-level language
+takes **94** minutes, so use an **XPath** query instead:
 
     PS C:\> (Get-Item $PathToEtl).Length/1Mb;
     357
@@ -418,7 +417,7 @@ direct approach:
             } | Select Message, TimeCreated }).TotalMinutes;
     94.3963127316667
 
-The query must follow the XML tree, displayed like this:
+Start by displaying the event layout:
 
     PS C:\> $xml = (Get-WinEvent $PathToEtl -Oldest | Select -First 1).ToXml();
     PS C:\> function prettify {
@@ -491,7 +490,7 @@ Launch the script:
     2023-12-24T15:00:03.3294125+02:00              100000
     2023-12-24T15:00:03.4387987+02:00              100000
 
-A readable XPath query can substitute *EventID 557*:
+A more readable XPath query can substitute *EventID 557*:
 
     PS C:\> prettify $a[0].ToXml();
     ...
@@ -504,7 +503,8 @@ A readable XPath query can substitute *EventID 557*:
         </Data>
 
     </EventData>
-    PS C:\> (Get-WinEvent -Path $PathToEtl -Oldest -FilterXPath "*[EventData[Data[@Name=""RequestedResolution""]]]").Count
+    PS C:\> $Xpath = "*[EventData[Data[@Name=""RequestedResolution""]]]";
+    PS C:\> (Get-WinEvent -Path $PathToEtl -Oldest -FilterXPath $Xpath).Count;
     2174
 
 Tracking Resolution Changes
@@ -535,24 +535,23 @@ Tracking Resolution Changes
     "@
     }
 
-    Register-NativeMethod "ntdll.dll" "int NtQueryTimerResolution(ref Int32 Max, ref Int32 Min,
-    ref Int32 Current)"
+    Register-NativeMethod "ntdll.dll" "int NtQueryTimerResolution(ref Int32 Max, ref Int32 Min, ref Int32 Current)"
     Add-NativeMethods
 
     [int]$min = 0;
     [int]$max = 0;
-    [int]$current = 0;
+    [int]$act = 0;
     $pmin = $min;
     $pmax = $max;
-    $pcurrent = $current;
+    $pact = $act;
 
     while ($true) {
-        [NativeMethods]::NtQueryTimerResolution([ref]$max, [ref]$min, [ref]$current) | Out-Null;
-        if ($pmin -ne $min -or $pmax -ne $max -or $pcurrent -ne $current) {
-            ("{0:O} frequency change $max, $min, $current" -f (Get-Date));
+        [NativeMethods]::NtQueryTimerResolution([ref]$max, [ref]$min, [ref]$act) | Out-Null;
+        if ($pmin -ne $min -or $pmax -ne $max -or $pact -ne $act) {
+            ("{0:O} frequency change $max, $min, $act" -f (Get-Date));
             $pmin = $min;
             $pmax = $max;
-            $pcurrent = $current;
+            $pact = $act;
         }
     }
 
@@ -643,7 +642,7 @@ probability for deviations.
 - [timeBeginPeriod](https://learn.microsoft.com/en-us/windows/win32/api/timeapi/nf-timeapi-timebeginperiod)
 sets the resolution, [timeGetDevCaps](https://learn.microsoft.com/en-us/windows/win32/api/timeapi/nf-timeapi-timegetdevcaps)
 returns the *MinimumResolution, MaximumResolution*. The parameters are expressed in *milliseconds*.
-- Applications are not meant to retrieve the current resolution, given the concurrent adjustment.
-- Timing deviations can be analyzed with `wpr` **Power** profiling . Use *XPath*
-to extract events from **.etl** file.
+- Applications are not meant to retrieve the active resolution, given the concurrent adjustment.
+- Timing deviations can be analyzed with *wpr* **Power** profiling . Process the *.etl* file 
+using **XPath** queries.
 - Typical clock frequency on *Windows 10* is **100 Hz**, *Windows Server* runs at **500 Hz**.
