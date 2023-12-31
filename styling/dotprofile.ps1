@@ -7,27 +7,15 @@ function StyleTo-Html
 
 .DESCRIPTION
     Redirect pandoc output into native file system. Add a border on <pre><code>
-    sequences, use Courier font.
-
-    Add the html file to the git index.
-
-.NOTES
-    A pandoc bug prevents conversion of sporadic keys. Until the cause is fixed,
-    the function is deactivated.
-    wsl --status
-    Default Distribution: openSUSE-Leap-15.4
-    Default Version: 2
-
+    sequences, use Courier font, table CSS formatting.
 #>
     param(
-        [string]$Path = (Get-Item *.md -EA SilentyContinue | Select -First 1).FullName
+        [string]$Path = (Get-Item *.md -EA SilentlyContinue | Select -First 1).FullName
     )
 
-    if (-not $Path) {
+    if (-not $Path -or -not (Test-Path $Path -PathType Leaf)) {
         throw "Specify a .md file to convert to html.";
     }
-
-    throw "pandoc within wsl.exe cannot render *.\microcontroller.exe*: StyleTo-Html .\NtQueryTimerResolution\usleep.html";
 
     $Path = Resolve-Path $Path;
     $i = Get-Item $Path;
@@ -36,28 +24,48 @@ function StyleTo-Html
     $cd = $i.DirectoryName;
     $to = $cd + "\" + $i.BaseName + ".html";
 
-    & wsl.exe --cd $cd -- pandoc -f markdown ./$bn > $to;
+    & wsl.exe --cd $cd -- pandoc -f markdown_mmd -t html ./$bn > $to;
     $ct = @'
 <html lang="en-us">
 <head>
     <style>
-        .newcode {
-            font-family: 'Courier New', Courier, monospace;
+        pre {
             border-color: black;
             border-width: 1px;
             border-style: solid;
+            background-color: whitesmoke;
+        }
+        code {
+            font-family: 'Courier New', Courier, monospace;
+        }
+        body {
+            font-family: Tahoma;
+        }
+        h1, h2 {
+            text-decoration: underline;
+        }
+        th, td {
+            border-bottom-color: black;
+            border-bottom-width: 1px;
+            border-bottom-style: solid;
+            border-spacing: 0;
+        }
+        th, td {
+            padding-left: 0;
+            padding-right: 0;
+        }
+        blockquote {
+            font-family: 'Times New Roman', Times, serif;
+            font-style: italic;
         }
     </style>
 </head>
 <body>
-'@ + (Get-Content -Raw $to).Replace("<pre><code>", "<pre class=""newcode""><code>") +
+'@ + (Get-Content -Raw $to) +
 @"
 </body>
 </html>
 "@;
     $ct | Set-Content -Encoding utf8 $to;
-
-    Push-Location $cd;
-    & git add -- $to;
-    Pop-Location;
+    Invoke-Item $to;
 }
