@@ -311,7 +311,8 @@ ETL Analysis
 Install the latest *Assesment and Deployment Kit*, as advised on [ETW Trace Processing Fails with Error Code 0x80070032](https://devblogs.microsoft.com/performance-diagnostics/etw-trace-processing-fails-with-error-code-0x80070032/).
 
 Launch *"C:\Program Files (x86)\Windows Kits\10\Windows Performance Toolkit\WPRUI.exe"*
-and specify only **Power** in the *Resource Analysis* tree. Press *Start*, leave it for 10 seconds, *Stop*, *Save* and *Lauch WPA*.
+with elevation, and specify only **Power** in the *Resource Analysis* tree. Press *Start*,
+leave it for 10 seconds, *Stop*, *Save* and *Lauch WPA*.
 
 On the *"Performance Analyzer"* GUI, look for *Generic Events*, expand *Microsoft-Windows-Kernel-Power*,
 select *SystemTimeResolutionKernelChangeInternal*, right click, *Filter to selection*.
@@ -356,7 +357,7 @@ SuperDuperEdr.exe*.
 
 The calls for a **10 ms** resolution belong to the *Idle* process.
 
-Generating the *.etl* from CLI requires elevation, unlike `WPRUI.exe`:
+Generating the *.etl* from CLI requires elevation:
 
     PS C:\> $wpr = "${env:ProgramFiles(x86)\Windows Kits\10\Windows Performance Toolkit\wpr.exe";
     PS C:\> & $wpr -start Power;
