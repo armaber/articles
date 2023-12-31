@@ -6,7 +6,7 @@ or tools.
 
 I am committed to the fitness of an idea being presented. Write an e-mail to point out
 gaps. Configuration, administrative tasks are crafted at speed, subject to clever
-improvements. Proofs and tedious confirmations are ommitted on purpose, though I am not
+improvements. Proofs and tedious confirmations are omitted on purpose, though I am not
 skipping on testing. I find it less than ideal if you, the developer, encounter a
 showstopper, by going with the flow.
 
