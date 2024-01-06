@@ -14,7 +14,8 @@ User reported a long time to complete for a tool. There is a code path that can 
 
 Here, the implementation relies on a timer being triggered with &#x00B5;s resolution.
 
-An overview of `usleep` calls during *microcontroller.exe* execution reveals:
+With **cdb.exe**, a breakpoint is placed on `SetWaitableTimer` and the 2nd argument is printed.
+The output is parsed, value divided by -10 to obtain the initial &#x00B5;s argument.
 
     PS C:\> $cdb = "${env:ProgramFiles(x86)}\Windows Kits\10\Debuggers\x64\cdb.exe";
     PS C:\> $cods = "bp kernel32!SetWaitableTimer "".symopt- 4; .printf \""SetWaitableTimer %N\"", dwo(@rdx); .echo; gc""; g; q";
@@ -31,10 +32,7 @@ An overview of `usleep` calls during *microcontroller.exe* execution reveals:
         4 1000
         1 200
 
-With **cdb.exe**, a breakpoint is placed on `SetWaitableTimer` and the 2nd argument is printed.
-The output is parsed, value divided by -10 to obtain the original &#x00B5;s argument.
-
-**329** calls for usleep of **130 ms** are made. `usleep(130000)` can be located in the source.
+**329** calls of **130 ms** are made. `usleep(130000)` can be located in the source.
 
 Many arguments are a multiple of 1 millisecond. The OS clock runs on a multiple of ms as well,
 so the deviation is small. On a hot-path containing `usleep(< 1000)`, the compound deviation
@@ -163,8 +161,7 @@ The alternative shows many hits:
 
 Plan
 ---
-- On stable systems, the *WaitableTimer* is triggered at resolution boundary. It does not have
-&#x00B5;s granularity.
+- On stable systems, the *WaitableTimer* is triggered at resolution boundary.
 - Implement and verify `usleep` as combination of `Sleep` and *CPU spin* for the remaining time.
 `Sleep` argument is a multiple of the resolution.
 - Identify a lightweight replacement for `NtSetTimerResolution`.
@@ -369,7 +366,7 @@ Generating the *.etl* from CLI requires elevation:
 
 - **EventID 557** is part of the tuple where
 `SystemTimeResolutionKernelChangeInternal` resides, in the *"Performance Analyzer"* GUI.
-This event is used a query key in subsequent CLIs.
+This event is used as query key in subsequent CLIs.
 - `xperf.exe -on PROC_THREAD+LOADER+PROFILE+POWER` does not capture *557*.
 
 Examples and Caveats
@@ -497,14 +494,13 @@ A more readable XPath query can substitute *EventID 557*:
 
     PS C:\> prettify $a[0].ToXml();
     ...
-        <EventData>
+    <EventData>
         <Data Name='RequestedResolution'>
             5000
         </Data>
         <Data Name='Tag'>
             1397707336
         </Data>
-
     </EventData>
     PS C:\> $Xpath = "*[EventData[Data[@Name=""RequestedResolution""]]]";
     PS C:\> (Get-WinEvent -Path $PathToEtl -Oldest -FilterXPath $Xpath).Count;
