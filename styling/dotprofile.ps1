@@ -10,7 +10,7 @@ function StyleTo-Html
     sequences, use Courier font, table CSS formatting.
 #>
     param(
-        [string]$Path = (Get-Item *.md -EA SilentlyContinue | Select -First 1).FullName
+        [string]$Path = (Get-Item *.md -EA SilentlyContinue | Select-Object -First 1).FullName
     )
 
     if (-not $Path -or -not (Test-Path $Path -PathType Leaf)) {
@@ -20,44 +20,52 @@ function StyleTo-Html
     $Path = Resolve-Path $Path;
     $i = Get-Item $Path;
 
-    $bn = $i.Name;
+    $bn = $i.FullName;
     $cd = $i.DirectoryName;
     $to = $cd + "\" + $i.BaseName + ".html";
 
-    & wsl.exe --cd $cd -- pandoc -f markdown_mmd -t html ./$bn > $to;
+    & ${env:LOCALAPPDATA}\Pandoc\pandoc.exe -f markdown -t html $bn > $to;
     $ct = @'
 <html lang="en-us">
+<title></title>
 <head>
     <style>
-        pre {
-            border-color: black;
-            border-width: 1px;
-            border-style: solid;
-            background-color: whitesmoke;
-        }
-        code {
-            font-family: 'Courier New', Courier, monospace;
-        }
-        body {
-            font-family: Tahoma;
-        }
-        h1, h2 {
-            text-decoration: underline;
-        }
-        th, td {
-            border-bottom-color: black;
-            border-bottom-width: 1px;
-            border-bottom-style: solid;
-            border-spacing: 0;
-        }
-        th, td {
-            padding-left: 0;
-            padding-right: 0;
-        }
-        blockquote {
-            font-family: 'Times New Roman', Times, serif;
-            font-style: italic;
-        }
+    pre {
+        border-color: black;
+        border-width: 1px;
+        border-style: solid;
+        background-color: whitesmoke;
+        border-radius: 5px;
+        padding: 10px;
+        text-wrap: pretty;
+    }
+    code {
+        font-family: 'Courier New', Courier, monospace;
+    }
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    table {
+        border-spacing: 0;
+    }
+    th, td, h1, h2 {
+        border-bottom: 1px solid black;
+    }
+    th, td {
+        padding: 4px;
+        border-left: 1px solid black;
+    }
+    blockquote {
+        font-style: italic;
+        margin-left: 15px;
+        margin-right: 15px;
+        border-left: 2px solid black;
+        padding-left: 5px;
+        padding-right: 5px;
+    }
+    .odd {
+        background-color: whitesmoke;
+    }
     </style>
 </head>
 <body>
@@ -66,6 +74,8 @@ function StyleTo-Html
 </body>
 </html>
 "@;
+    $title = Get-Content $i.FullName -First 1;
+    $ct = $ct.Replace("<title></title>", "<title>$title</title>");
     $ct | Set-Content -Encoding utf8 $to;
     Invoke-Item $to;
 }
