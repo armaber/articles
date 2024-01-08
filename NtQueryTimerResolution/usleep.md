@@ -18,7 +18,7 @@ With **cdb.exe**, a breakpoint is placed on `SetWaitableTimer` and the 2nd argum
 The output is parsed, value divided by -10 to obtain the initial &#x00B5;s argument.
 
     PS C:\> $cdb = "${env:ProgramFiles(x86)}\Windows Kits\10\Debuggers\x64\cdb.exe";
-    PS C:\> $cods = "bp kernel32!SetWaitableTimer "".symopt- 4; .printf \""SetWaitableTimer %N\"", dwo(@rdx); .echo; gc""; g; q";
+    PS C:\> $cods = ".symopt- 4; bp kernel32!SetWaitableTimer "".printf \""SetWaitableTimer %N\"", dwo(@rdx); .echo; gc""; g; q";
     PS C:\> $output = & $cdb -c $cods .\microcontroller.exe
     PS C:\> $output | Where {$_ -like "SetWaitableTimer *"} | Foreach {
                 [int]("0x"+($_ -split " 0{8,8}")[1])/-10
