@@ -12,6 +12,8 @@ you, as developer, encounter a showstopper, by going with the flow.
 Here's the first topic:
 - [NtQueryTimerResolution](./NtQueryTimerResolution/usleep.md): thread quantum is not
 constant on Windows, applications adjust it at will.
+- [SRDB](./AcpiEvalSBUS/srdb.md): Intel PCH contains ACPI methods that can drive
+  SMBUS wire protocol.
 
 Upcoming:
 - *HeavyDutyUF*: disassemble the kernel to build a call tree for a chosen symbol.
