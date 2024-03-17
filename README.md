@@ -9,7 +9,7 @@ gaps. Configuration, administrative tasks are crafted at speed, subject to impro
 Testing or tedious confirmations are mostly unmentioned. I find it less than ideal if
 you, as developer, encounter a showstopper, by going with the flow.
 
-Here's the first topic:
+Topics:
 - [NtQueryTimerResolution](./NtQueryTimerResolution/usleep.md): thread quantum is not
 constant on Windows, applications adjust it at will.
 - [SRDB](./AcpiEvalSBUS/srdb.md): Intel PCH contains ACPI methods that can drive
