@@ -5,14 +5,14 @@ Introduction
 -
 
 In user mode, there are no built-in APIs to issue SMBUS commands. Both Intel
-and AMD processor package allocates a dedicated function, part of the chipset,
+and AMD packages implement a dedicated function, part of the chipset,
 which can drive the electrical protocol.
 
 The function is placed at a fixed BDF: newer Intel uses 0:1F.4, AMD uses 0:14.0.
 
 The SMBUS registers such as *address, command, status, protocol type, start, stop*
-are represented in IO Port space. Intel does **not document** the wait-state
-between *status* reads, while AMD does document it.
+are represented in IO port space. Intel does **not document** the wait-state
+between *status* reads, while AMD does.
 
 *Some* Intel models expose **ACPI methods** that encapsulate the wait-states.
 AMD places the SMBUS controller outside of ACPI.
@@ -64,11 +64,11 @@ Research
 *ACPI Component Architecture* SDK has samples that extract the ACPI table.
 Method evaluation is not part of the source code.
 
-During OS uptime, the device objects call into the driver stack. Iris gfx issues
-*\_DOD* method to determine devices attached to it. Every method invocation by an FDO
+During OS uptime, the device objects call into the driver stack. For example, Iris gfx
+issues *\_DOD* method to determine devices attached to it. Every method invocation by an FDO
 implementing an embedded controller is
 [solved](https://learn.microsoft.com/en-us/windows-hardware/drivers/acpi/device-stacks-for-an-acpi-device)
-by the ACPI driver underneath.
+by the ACPI driver underneath: audio, ethernet, wifi, storage controller, display, bluetooth.
 > If an ACPI device is a hardware device integrated into the system board,
 > the system creates a device stack with a bus filter device object (filter DO)
 
@@ -92,10 +92,7 @@ ffffba8a`c97888b0  41 65 69 43 5f 44 53 4d-3c 00 00 00 04 00 00 00  AeiC_DSM<...
 0a USBXHCI!Controller_Create
 0b USBXHCI!Controller_WdfEvtDeviceAdd
 ~~~
-
-The USB controller FDO calls the *_DSM* method into the ACPI driver.
-> This optional object is a control method that enables devices to provide device
-> specific control functions that are consumed by the device driver.
+In this case, the USB controller FDO calls the *_DSM* method into the ACPI driver.
 
 The entry points of the filter driver are located in
 *_DEVICE_OBJECT->_DRIVER_OBJECT->MajorFunction*.
@@ -107,9 +104,9 @@ The entry points of the filter driver are located in
     [27] : 0xfffff80774d71010 : ACPI!ACPIDispatchIrp+0x0 [Type: long (__cdecl*)(_DEVICE_OBJECT *,_IRP *)]
 ~~~
 
-The driver uses one entry point that handles all IRP_MJ functions, including
-IRP_MJ_CREATE at offset 0. By the time MJ_CREATE is called, a name must have
-been generated. Let's disassemble AddDevice, placed in DriverExtension field:
+*ACPIDispatchIrp*  handles all IRP_MJ functions, including IRP_MJ_CREATE at offset 0.
+By the time MJ_CREATE is called, a name must have been generated. Let's disassemble
+AddDevice, placed in DriverExtension field:
 ~~~
 2: kd> dx ((nt!_DRIVER_OBJECT *)((nt!_DEVICE_OBJECT *)@RCX)->DriverObject)->DriverExtension->AddDevice
 0xfffff80330665100 : ACPI!ACPIDispatchAddDevice+0x0 [Type: long (__cdecl*)(_DRIVER_OBJECT *,_DEVICE_OBJECT *)]
@@ -211,7 +208,7 @@ If(COMP())
 }
 Return(0xffff)
 ```
-The read-byte protocol returns *0xFFFF* in case of failure, or a byte value.
+The read-byte protocol returns 0xFFFF in case of failure, or a byte value.
 The input parameters and the return value are handled:
 ```
 acpi = context->Acpi;
@@ -260,8 +257,8 @@ is not recognized by slave or the address is not valid.
 Read-word protocol takes an identical approach: the cookie is set to MAX_UINT
 in case of failure.
 
-For statistical purposes, the call is measured. Failure lasts for 200+
-miliseconds, normal command takes &lt;570 &#x00B5;s.
+For statistical purposes, the call is measured. Failure lasts for 200+ ms, normal
+command takes &lt;570 &#x00B5;s.
 
 Read-block protocol returns a buffer in case of success or an integer:
 ```
@@ -316,9 +313,9 @@ if (response->Argument[0].Type == ACPI_METHOD_ARGUMENT_INTEGER && !cookie) {
     RtlCopyMemory(buffer, 1+(PUCHAR)response->Argument[0].Data, count);
 }
 ```
-A client for ACPI SMBUS methods can implement a table of known wrappers
-for *IOCTL_ACPI_EVAL_METHOD_EX*. At runtime, the wrappers are tested on a
-passive device like *SMBUS_SMART_BATTERY_ADDRESS*. The battery responds to
+A client for ACPI SMBUS methods can implement a table of known wrappers on top
+of*IOCTL_ACPI_EVAL_METHOD_EX*. At runtime, the wrappers are tested using a
+passive device like *SMBUS_SMART_BATTERY_ADDRESS*. The device responds to
 read-word protocol or returns a value out of range. Both cases indicate
 that the method is present and a proper slave device can be adressed.
 ```
@@ -386,8 +383,8 @@ if (context->Cpuinfo.Vendor == VENDOR_INTEL) {
 }
 ```
 
-*Note:* for each *EVAL* ioctl, the OS creates a watchdog timer that expires
-in 30 seconds; it *does overreact*.
+*Note:* for each EVAL ioctl, the OS creates a watchdog timer that expires in 30
+seconds; it *does overreact*.
 
 Statistics
 -
@@ -447,9 +444,9 @@ function invokeScript()
     host.diagnostics.debugLog("\"cpuinfo\": [\"", output[4], "\", \n    \"", output[5], "\"]\n} \n");
 }
 ~~~
-The script centers on *!amli find SBUS* and uses *!sysinfo cpuinfo* to
-gather adjacent data about the model. If there are other SMBUS devices,
-their BDF is printed using *!pcitree*.
+The script centers on *!amli find SBUS* and uses *!sysinfo cpuinfo* to gather
+adjacent data about the model. If there are other SMBUS devices, their BDF is
+printed using *!pcitree*.
 
 Of 11 Intel systems, 7 Xeon and 4 Core, only 2 Core SKUs implement the full
 range of SMBUS transfer types as ACPI methods.
