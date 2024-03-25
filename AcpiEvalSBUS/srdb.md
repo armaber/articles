@@ -68,11 +68,12 @@ Research
 *ACPI Component Architecture* SDK has samples that extract the ACPI table.
 Method evaluation is not part of the source code.
 
-During OS uptime, the device objects call into the driver stack. For example, Iris gfx
-issues *\_DOD* method to determine devices attached to it. Every method invocation by an FDO
-implementing an embedded controller is
-[solved](https://learn.microsoft.com/en-us/windows-hardware/drivers/acpi/device-stacks-for-an-acpi-device)
-by the ACPI driver underneath: audio, ethernet, wifi, storage controller, display, bluetooth.
+During OS uptime, the device objects call into the driver stack. For example,
+Iris gfx issues *\_DOD* method to determine devices attached to it. Every method
+invocation by an FDO implementing an embedded controller is
+[solved](https://learn.microsoft.com/en-us/windows-hardware/drivers/acpi/device-stacks-for-an-acpi-device) by the ACPI driver underneath: audio, ethernet,
+wifi, storage controller, display, bluetooth.
+
 > If an ACPI device is a hardware device integrated into the system board,
 > the system creates a device stack with a bus filter device object (filter DO)
 
@@ -99,7 +100,7 @@ ffffba8a`c97888b0  41 65 69 43 5f 44 53 4d-3c 00 00 00 04 00 00 00  AeiC_DSM<...
 In this case, the USB controller FDO calls the *\_DSM* method into the ACPI driver.
 
 The entry points of the filter driver are located in
-*\_DEVICE_OBJECT->\_DRIVER\_OBJECT->MajorFunction*.
+*\_DEVICE_OBJECT&#8594;\_DRIVER\_OBJECT&#8594;MajorFunction*.
 
 ```
 2: kd> dt nt!_DEVICE_OBJECT DriverObject @RCX  
@@ -111,8 +112,8 @@ The entry points of the filter driver are located in
 ...
     [27] 0xfffff804`f72a1010     long  ACPI!ACPIDispatchIrp+0
 ```
-*ACPIDispatchIrp*  handles all IRP_MJ functions, including IRP\_MJ\_CREATE at offset 0.
-By the time MJ\_CREATE is called, a name must have been generated. Let's disassemble
+*ACPIDispatchIrp*  handles all IRP_MJ functions, including *IRP\_MJ\_CREATE* at offset 0.
+By the time CREATE is called, a name must have been generated. Let's disassemble
 AddDevice, placed in DriverExtension field:
 ```
 2: kd> dx ((nt!_DRIVER_OBJECT *)((nt!_DEVICE_OBJECT *)@RCX)->DriverObject)->DriverExtension->AddDevice
@@ -397,6 +398,56 @@ if (context->Cpuinfo.Vendor == VENDOR_INTEL) {
 Note: for each EVAL ioctl, the OS creates a watchdog timer that expires in 30
 seconds; it *does overreact*.
 
+Synchronization
+-
+
+The *STRT* method polls bit 6 on *HSTS* as long as there is a consumer, using 
+a *Sleep(1ms)*. The specification
+[states](https://uefi.org/specs/ACPI/6.5/05_ACPI_Software_Programming_Model.html#control-method-execution):
+
+> Interpretation of a Control Method is not preemptive, but it can block. When
+> a control method does block, OSPM can initiate or continue the execution of
+> a different control method. A control method can only assume that access to
+> global objects is exclusive for any period the control method does not block.
+
+The operating regions are exclusive by [design](https://uefi.org/specs/ACPI/6.5/05_ACPI_Software_Programming_Model.html#access-to-operation-regions).
+
+  > Control methods must have exclusive access to any address accessed via fields
+  > declared in Operation Regions.
+
+```
+| OpRegion(SMBI:RegionSpace=SystemIO,Offset=0xf040,Len=16)
+| Field(:Base=SMBI,BaseObjData=ffffd1099d507078)
+| * Base =>OpRegion(:RegionSpace=SystemIO,Offset=0xf040,Len=16)
+| FieldUnit(HSTS:FieldParent=ffffd1099d5070e8,ByteOffset=0x0,
+            StartBit=0x0,NumBits=8,FieldFlags=0x1)
+| FieldUnit(:FieldParent=ffffd1099d5070e8,ByteOffset=0x1,
+            StartBit=0x0,NumBits=8,FieldFlags=0x1)
+| FieldUnit(HCON:FieldParent=ffffd1099d5070e8,ByteOffset=0x2,
+            StartBit=0x0,NumBits=8,FieldFlags=0x1)
+| FieldUnit(HCOM:FieldParent=ffffd1099d5070e8,ByteOffset=0x3,
+            StartBit=0x0,NumBits=8,FieldFlags=0x1)
+| FieldUnit(TXSA:FieldParent=ffffd1099d5070e8,ByteOffset=0x4,
+            StartBit=0x0,NumBits=8,FieldFlags=0x1)
+| FieldUnit(DAT0:FieldParent=ffffd1099d5070e8,ByteOffset=0x5,
+            StartBit=0x0,NumBits=8,FieldFlags=0x1)
+| FieldUnit(DAT1:FieldParent=ffffd1099d5070e8,ByteOffset=0x6,
+            StartBit=0x0,NumBits=8,FieldFlags=0x1)
+| FieldUnit(HBDR:FieldParent=ffffd1099d5070e8,ByteOffset=0x7,
+            StartBit=0x0,NumBits=8,FieldFlags=0x1)
+| FieldUnit(PECR:FieldParent=ffffd1099d5070e8,ByteOffset=0x8,
+            StartBit=0x0,NumBits=8,FieldFlags=0x1)
+| FieldUnit(RXSA:FieldParent=ffffd1099d5070e8,ByteOffset=0x9,
+            StartBit=0x0,NumBits=8,FieldFlags=0x1)
+| FieldUnit(SDAT:FieldParent=ffffd1099d5070e8,ByteOffset=0xa,
+            StartBit=0x0,NumBits=16,FieldFlags=0x1)
+```
+
+As long as there are no errors and no contention, the method is executed with
+full control. For comparison, *Linux kernel* and *ReactOS* acquire an interpreter
+lock with each method invocation. The lock is released and acquired when calling
+*Sleep*. *Stall* does not relinquish the thread.
+
 Data Gathering
 -
 The ACPI bitmap is preserved in *Memory.DMP* generated with a BSOD. The files
@@ -404,39 +455,34 @@ can be processed with *KD.exe* using JavaScript:
 ```
 "use strict";
 
-function dumpBlock(b)
+function toString(s)
 {
-    if (typeof b == "string") {
-        host.diagnostics.debugLog("\"",b, "\",\n");
-        return;
+    if (typeof s == "string") {
+        return s;
     }
-    for (var line of b) {
-        host.diagnostics.debugLog("\"",line, "\",\n");
+    var m = ""
+    for (var i of s) {
+        m += i + "\n";
     }
+    return m;
 }
 
 function invokeScript()
 {
     var ctl = host.namespace.Debugger.Utility.Control;
-    var output = host.namespace.Debugger.Sessions[0];
-    var count = host.namespace.Debugger.Sessions.Count()-1;
+    var devext = new Array();
+    var amli = new Array();
 
-    host.diagnostics.debugLog("{\n\"session\": \"", host.namespace.Debugger.Sessions[count], "\",\n");
-    output = ctl.ExecuteCommand("!pcitree");
+    var output = ctl.ExecuteCommand("!pcitree");
 
     for (var line of output) {
         if (line.match("Serial Bus Controller/Unknown Sub Class")) {
-            host.diagnostics.debugLog("\"devext\": [\n")
-            var devext = "!devext " + line.split(" devext ")[1].split(" ")[0];
-            host.diagnostics.debugLog("\"",line.trim(),"\",\n");
-            dumpBlock(devext);
-            var dout = ctl.ExecuteCommand(devext);
+            var dbgcli = "!devext " + line.split(" devext ")[1].split(" ")[0];
+            var dout = ctl.ExecuteCommand(dbgcli);
             if (!dout[0].match("PDO Extension, Bus 0x0,")) {
-                host.diagnostics.debugLog("],\n");
                 continue;
             }
-            dumpBlock(dout);
-            host.diagnostics.debugLog("\"\"],\n");
+            devext.push(toString(dout));
         }
     }
 
@@ -445,14 +491,18 @@ function invokeScript()
         if (line.trim() == "") {
             continue;
         }
-        host.diagnostics.debugLog("\"amli\": [");
         var dout = ctl.ExecuteCommand("!amli dns /s " + line);
-        dumpBlock(dout);
-        host.diagnostics.debugLog("\"\"],\n");
+        amli.push(toString(dout));
     }
 
     output = ctl.ExecuteCommand("!sysinfo cpuinfo");
-    host.diagnostics.debugLog("\"cpuinfo\": [\"", output[4], "\", \n    \"", output[5], "\"]\n} \n");
+    var cpuinfo = output[4] + "\n" + output[5];
+    var j = JSON.stringify({
+        devext: devext,
+        amli: amli,
+        cpuinfo: cpuinfo
+    });
+    host.diagnostics.debugLog(j);
 }
 ```
 The script centers on *!amli find SBUS* and uses *!sysinfo cpuinfo* to gather
@@ -464,17 +514,13 @@ range of SMBUS transfer types as ACPI methods.
 
 Conclusion
 -
-* Typical consumers of ACPI are ECs whose FDOs lie on top of ACPI.
+* Typical consumers of ACPI are ECs whose FDOs lie on top of ACPI filter.
 * Remote clients can invoke SMBUS ACPI methods after opening a root object name
   and computing the absolute path. The method is decompiled, input arguments and
   return value are part of *IOCTL\_ACPI\_EVAL\_METHOD\_EX*.
-* ACPI methods read and write to locations contained in an operating region.
-  Though the host controller has a semaphore bit, the method is synchronized
-  by [design](https://uefi.org/specs/ACPI/6.5/05_ACPI_Software_Programming_Model.html#access-to-operation-regions).
-  > Control methods must have exclusive access to any address accessed via fields
-  > declared in Operation Regions.
 * SMBUS can be accessed either with ACPI methods or with IO ports. IO ports
   implementation can gather a baseline from different platforms and specify
-  the largest wait-state.
+  the largest wait-state. The host controller supports up to 100 kHz clock speed.
+  An algorithm can be easily approached through electrical engineering.
 * Applications cannot access directly the root object.
   *IRP\_MJ\_DEVICE\_CONTROL* is handled differently than *IRP\_MJ\_INTERNAL\_DEVICE\_CONTROL*.
