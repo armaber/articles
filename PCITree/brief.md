@@ -63,7 +63,7 @@ Win32APIs.
 * `Win32_PnPAllocatedResource, Win32_DeviceMemoryAddress` associators lead to false
 positives: the BARs are not unique, 64-bit BARs are truncated to 32-bit.
 
-For brevity, `MEM_RESOURCE` structure is marked as *unsafe*: *MD_Alloc_Base, MD_Alloc_End*
+For brevity, `MEM_RESOURCE` structure is marked as *unsafe*: `MD_Alloc_Base`, `MD_Alloc_End`
 are padded.
 
 `-AsHTML` cli switch is fully fledged: driver stack, NUMA node, problem code linked
@@ -79,4 +79,3 @@ Notes
   the browser.
 * A progress bar shows the amount of devices enumerated until completion. Large PCIe
   hierarchy with hundreds of devices takes 20+ seconds to be shown.
-* Some fields are not self explanatory; PCI eXpress familiarity is assumed.
