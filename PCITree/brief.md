@@ -42,7 +42,7 @@ An element in the hierarchy has one `DEVPKEY_Device_Parent`, multiple `Descendan
 Before computing the descendants, the list is sorted by BDF, then ACPI root complexes
 are given priority: 
 
-* *BDF* sort can place the RC at random indexes among PCIe devices whith same `0:0.0`
+* *BDF* sort can place the RC at random indexes among PCIe devices with same `0:0.0`
   location. 
 
 On systems with multiple root complexes, the `ACPI\PNP0A08\`
@@ -58,9 +58,13 @@ representation consistent.
 ```
 
 *Base address registers* are computed with `CM_Get_First_Log_Conf` and `CM_Get_Res_Des_Data`
-Win32APIs. `Win32_PnPAllocatedResource, Win32_DeviceMemoryAddress` associators lead to false
+Win32APIs.
+
+* `Win32_PnPAllocatedResource, Win32_DeviceMemoryAddress` associators lead to false
 positives: the BARs are not unique, 64-bit BARs are truncated to 32-bit.
-`MEM_RESOURCE` structure is marked as *unsafe*: *MD_Alloc_Base, MD_Alloc_End* are padded.
+
+For brevity, `MEM_RESOURCE` structure is marked as *unsafe*: *MD_Alloc_Base, MD_Alloc_End*
+are padded.
 
 `-AsHTML` cli switch is fully fledged: driver stack, NUMA node, problem code linked
 to documentation, number of processor packages are among the properties being displayed.
@@ -75,3 +79,4 @@ Notes
   the browser.
 * A progress bar shows the amount of devices enumerated until completion. Large PCIe
   hierarchy with hundreds of devices takes 20+ seconds to be shown.
+* Some fields are not self explanatory; PCI eXpress familiarity is assumed.
