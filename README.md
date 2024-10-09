@@ -14,6 +14,7 @@ Topics:
 constant on Windows, applications adjust it at will.
 - [SRDB](./AcpiEvalSBUS/srdb.md): Intel PCH contains ACPI methods that can drive
   SMBUS wire protocol.
+- [PCITree](./PCITree/pcitree.md): Quick overview of PCITree.ps1 implementation.
 
 Upcoming:
 - *HeavyDutyUF*: disassemble the kernel to build a call tree for a chosen symbol.
