@@ -1,7 +1,7 @@
 PCIe Device Listing on Windows
 ===
 
-With [PCITree.ps1](https://github.com/armaber/scripts/blob/main/PCITree/PCITree.ps1), 
+With [PCITree.ps1](https://github.com/armaber/scripts/blob/main/PCITree/PCITree.ps1),
 the PCIe hierarchy is retrieved and represented either as console *highlighted*
 or *html*. IT personnel can use or expand the tool in support cases.
 
@@ -32,7 +32,7 @@ it can be replaced with `Get-PnPDeviceProperty` cmdlet and have full support for
         },
         @{ Name="Service";
         Expression={ if ($_.Service) { $_.Service } else {
-                $_.GetDeviceProperties("DEVPKEY_Device_DriverInfSection").deviceProperties.Data 
+                    $_.GetDeviceProperties("DEVPKEY_Device_DriverInfSection").deviceProperties.Data
                 }
             }
         };
@@ -40,20 +40,23 @@ it can be replaced with `Get-PnPDeviceProperty` cmdlet and have full support for
 
 An element in the hierarchy has one `DEVPKEY_Device_Parent`, multiple `Descendant`s.
 Before computing the descendants, the list is sorted by BDF, then ACPI root complexes
-are given priority: 
+are given priority:
 
 * *BDF* sort can place the RC at random indexes among PCIe devices with same `0:0.0`
-  location. 
+  location.
 
-On systems with multiple root complexes, the `ACPI\PNP0A08\`
-device ID has a suffix in hexadecimal. Sorting by suffix keeps the overall tree
-representation consistent.
+On systems with multiple root complexes, the device ID has a hexadecimal suffix next
+to `ACPI\PNP0A08\`. Sorting by this suffix keeps the overall tree representation
+consistent.
 
 ```powershell
     $List.Value = $List.Value | Sort-Object BDF;
-    $acpi = @($List.Value | Where-Object { $_.DeviceID -like 'ACPI\PNP0A08\*' } | Sort-Object `
-                @{ Expression={ [Int]("0x"+($_.DeviceID -split '\\')[-1]) } });
-    $pci = $List.Value | Where-Object { $_.DeviceID -like 'PCI\*' };
+    $acpi = @($List.Value | Where-Object { $_.DeviceID -like "ACPI\PNP0A08\*" } | Sort-Object `
+                @{ Expression={ $prefix = ($_.DeviceID -split "\\")[-1];
+                                [Int]("0x$prefix")
+                    }
+                });
+    $pci = $List.Value | Where-Object { $_.DeviceID -like "PCI\*" };
     $List.Value = $acpi + $pci;
 ```
 
@@ -66,6 +69,30 @@ positives: the BARs are not unique, 64-bit BARs are truncated to 32-bit.
 For brevity, `MEM_RESOURCE` structure is marked as *unsafe*: `MD_Alloc_Base`, `MD_Alloc_End`
 are padded.
 
+```powershell
+    $co = [System.CodeDom.Compiler.CompilerParameters]::new();
+    $co.CompilerOptions += "/unsafe";
+
+    Add-Type -CompilerParameters $co @"
+        [StructLayout(LayoutKind.Sequential)]
+        unsafe public struct MEM_RESOURCE
+        {
+            public UInt32 MD_Count;
+            public UInt32 MD_Type;
+            public UInt64 MD_Alloc_Base;
+            public UInt64 MD_Alloc_End;
+            public fixed UInt32 Unused[11];
+        };
+
+        [DllImport("cfgmgr32.dll")]
+        public static extern UInt32
+            CM_Get_Res_Des_Data(IntPtr ResDes,
+                                ref MEM_RESOURCE Buffer,
+                                UInt32 BufferLen,
+                                UInt32 Flags);
+"@;
+```
+
 `-AsHTML` cli switch is fully fledged: driver stack, NUMA node, problem code linked
 to documentation, number of processor packages are among the properties being displayed.
 *"Native hot-plug interrupts granted by firmware"* indicates platform support for adapter
@@ -77,5 +104,5 @@ Notes
 * Heavy `<table>` usage leads to gaps on rendering the contracted descendants.
 * [lspci windows](https://eternallybored.org/misc/pciutils/) is currently blacklisted by
   the browser.
-* A progress bar shows the amount of devices enumerated until completion. Large PCIe
-  hierarchy with hundreds of devices takes 20+ seconds to be shown.
+* Large PCIe hierarchy with hundreds of devices takes 20+ seconds to be shown. A progress
+  bar yields the devices enumerated until completion.
