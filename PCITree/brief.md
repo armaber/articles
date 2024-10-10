@@ -52,8 +52,8 @@ consistent.
 ```powershell
     $List.Value = $List.Value | Sort-Object BDF;
     $acpi = @($List.Value | Where-Object { $_.DeviceID -like "ACPI\PNP0A08\*" } | Sort-Object `
-                @{ Expression={ $prefix = ($_.DeviceID -split "\\")[-1];
-                                [Int]("0x$prefix")
+                @{ Expression={ $suffix = ($_.DeviceID -split "\\")[-1];
+                                [Int]("0x$suffix")
                     }
                 });
     $pci = $List.Value | Where-Object { $_.DeviceID -like "PCI\*" };
