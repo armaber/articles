@@ -46,8 +46,7 @@ are given priority:
   location.
 
 On systems with multiple root complexes, the device ID has a hexadecimal suffix next
-to `ACPI\PNP0A08\`. Sorting by this suffix keeps the overall tree representation
-consistent.
+to `ACPI\PNP0A08\`. Sorting by suffix keeps the tree representation consistent.
 
 ```powershell
     $List.Value = $List.Value | Sort-Object BDF;
@@ -63,8 +62,8 @@ consistent.
 *Base address registers* are computed with `CM_Get_First_Log_Conf` and `CM_Get_Res_Des_Data`
 Win32APIs.
 
-* `Win32_PnPAllocatedResource, Win32_DeviceMemoryAddress` associators lead to false
-positives: the BARs are not unique, 64-bit BARs are truncated to 32-bit.
+* `Win32_PnPAllocatedResource, Win32_DeviceMemoryAddress` associators lead to noise:
+  the BARs are not unique, 64-bit BARs are truncated to 32-bit.
 
 For brevity, `MEM_RESOURCE` structure is marked as *unsafe*: `MD_Alloc_Base`, `MD_Alloc_End`
 are padded.
@@ -98,6 +97,21 @@ to documentation, number of processor packages are among the properties being di
 *"Native hot-plug interrupts granted by firmware"* indicates platform support for adapter
 hot remove/add.
 
+```powershell
+    ImportNative;
+
+    $devs = GetPCIeDevNodes;
+    PCITree ([ref]$devs);
+
+    if ($PSCmdlet.ParameterSetName -eq "HTML") {
+        $ct = RenderHTML $devs;
+        GenerateFileName ([ref]$ct);
+    } else {
+        PrintHeader;
+        DisplayConsole $devs;
+    }
+```
+
 Notes
 ---
 * Use `Set-ExecutionPolicy Bypass -Scope Process` before launching the script.
@@ -106,3 +120,10 @@ Notes
   the browser.
 * Large PCIe hierarchy with hundreds of devices takes 20+ seconds to be shown. A progress
   bar yields the devices enumerated until completion.
+* `-AsVT` output can have its information stream redirected to a file. Coloring is
+  preserved:
+
+```powershell
+    .\PCITree.ps1 -AsVT 6>results.txt;
+    Get-Content results.txt;
+```
