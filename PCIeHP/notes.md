@@ -202,6 +202,12 @@ Automation
    ffffbb0e1bf6e781 : | Return(Local0)
    ffffbb0e1bf6e783 : }
 
+   ffffbb0e1e9b825a:[\NHPG]
+   ffffbb0e1e9b825a : Store(Zero, \_SB_.PCI0.RP01.HPEX)
+   ffffbb0e1e9b826f : Store(Zero, \_SB_.PCI0.RP02.HPEX)
+   ffffbb0e1e9b8452 : Store(One, \_SB_.PCI0.RP01.HPSX)
+   ffffbb0e1e9b8467 : Store(One, \_SB_.PCI0.RP02.HPSX)
+
    Integer(SUPP:Value=0x000000000000001f[31])
    Integer(CTRL:Value=0x0000000000000015[21])
    
@@ -228,6 +234,9 @@ Automation
      DevObj 0xffffbb0e1c9b5730  Parent FDO DevExt 0xffffbb0e1c9064c0
      Vendor ID 10b5 (PLX TECHNOLOGY, INC.)  Device ID 8724
      Subsystem Vendor ID 10b5 (PLX TECHNOLOGY, INC.)  Subsystem ID 8724
+
+   Identifier = REG_SZ Intel64 Family 6 Model 158 Stepping 10
+   ProcessorNameString = REG_SZ Intel(R) Core(TM) i7-9850HE CPU @ 2.70GHz
 ~~~
 
 Summary
