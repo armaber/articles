@@ -252,7 +252,8 @@ Summary
   with **!arbiter 4**
 
 ~~~
-   PS > "Detect_OSC.js", "NativeHotPlugSupport.ps1" | foreach {
-         Invoke-WebRequest https://github.com/armaber/scripts/NativeHotPlugSupport/$PSItem -OutFile $PSItem;
-      }
+   PS > $prefix = "https://raw.githubusercontent.com/armaber/scripts/refs/heads/main/"
+        "Detect_OSC.js", "NativeHotPlugSupport.ps1" | foreach {
+            Invoke-WebRequest $prefix/NativeHotPlugSupport/$PSItem -OutFile $PSItem;
+         }
 ~~~
