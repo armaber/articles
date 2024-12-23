@@ -155,7 +155,7 @@ Automation
 4. CPU name and model
 
 ~~~
-   PS > & '.\NativeHotPlugSupported.ps1' .\MEMORY.DMP
+   PS > & '.\NativeHotPlugSupported.ps1' -Path .\MEMORY.DMP
    ffffbb0e1bf6e6b2:[\_SB.PCI0._OSC]
    ffffbb0e1bf6e6b2 : Store(Arg3, Local0)
    ffffbb0e1bf6e6b5 : CreateDWordField(Local0, Zero, CDW1)
@@ -235,8 +235,8 @@ Automation
      Vendor ID 10b5 (PLX TECHNOLOGY, INC.)  Device ID 8724
      Subsystem Vendor ID 10b5 (PLX TECHNOLOGY, INC.)  Subsystem ID 8724
 
-   Identifier = REG_SZ Intel64 Family 6 Model 158 Stepping 10
    ProcessorNameString = REG_SZ Intel(R) Core(TM) i7-9850HE CPU @ 2.70GHz
+   Identifier = REG_SZ Intel64 Family 6 Model 158 Stepping 10
 ~~~
 
 Summary
