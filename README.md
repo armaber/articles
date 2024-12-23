@@ -14,7 +14,8 @@ Topics:
 constant on Windows, applications adjust it at will.
 - [SRDB](./AcpiEvalSBUS/srdb.md): Intel PCH contains ACPI methods that can drive
   SMBUS wire protocol.
-- [PCITree](./PCITree/brief.md): quick overview of PCITree.ps1 implementation.
+- [PCITree](./PCITree/brief.md): mentions on PCIe scripted enumeration on Windows.
+- [NativeHotPlugGranted](./PCIeHP/notes.md): Windows and ACPI support for PCIe hot plug.
 
 Upcoming:
 - *HeavyDutyUF*: disassemble the kernel to build a call tree for a chosen symbol.
