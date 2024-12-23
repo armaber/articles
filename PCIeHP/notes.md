@@ -84,7 +84,7 @@ Hot plug is handled by the ISR, DPC and collateral timer for error handling. Ove
       return;
    }
    if (SlotControl.PresenceDetectEnable && SlotStatus.PresenceDetectChanged) {
-      Write1ToClear(&SlotStatus.PresentDetectChanged);
+      W1TC(SlotStatus.PresentDetectChanged);
       if (SlotStatus.PresenceDetectState) {
          call nt!IoInvalidateDeviceRelations;
       } else {
@@ -102,7 +102,6 @@ on the port. The PCI driver rescans the bus, creates a new device object.
          pci!PciProcessNewDevice
             lock xadd dword ptr [pci!PciDeviceSequenceNumber (fffff807`194fc250)],r9d
             lea  r8,[pci!`string' (fffff807`194f3af0)] = "\Device\NTPNP_PCI%04d"
-            call pci!RtlStringCbPrintfW (fffff807`194d3530)
             nt!IoCreateDevice
 ~~~
 
