@@ -10,9 +10,9 @@ grant *native hot plug*.
 
 ~~~
    PS > (
-         Get-PnPDevice -InstanceId "ACPI\PNP0A08*" | Get-PnpDeviceProperty 
-         DEVPKEY_PciRootBus_PCIExpressNativeHotPlugControl |
-         Where-Object { $_.Data }
+            Get-PnPDevice -InstanceId "ACPI\PNP0A08*" | Get-PnpDeviceProperty 
+            DEVPKEY_PciRootBus_PCIExpressNativeHotPlugControl |
+            Where-Object { $_.Data }
         ).InstanceId
 ~~~
 
@@ -251,7 +251,7 @@ Summary
   with **!arbiter 4**
 
 ~~~
-   PS > $prefix = "https://raw.githubusercontent.com/armaber/scripts/refs/heads/main/"
+   PS > $prefix = "https://raw.githubusercontent.com/armaber/scripts/refs/heads/main/";
         "Detect_OSC.js", "NativeHotPlugSupport.ps1" | foreach {
             Invoke-WebRequest $prefix/NativeHotPlugSupport/$PSItem -OutFile $PSItem;
          }
