@@ -1,7 +1,7 @@
 PCIe Hot Plug on Windows
 ===
 
-*Though the OS supports PCIe hot plug, on-premise indicators are sparsely specified.
+*While the OS supports PCIe hot plug, on-premise indicators are sparsely specified.
 A method to ascertain system support is put forward.*
 
 * In Device Manager, hot plug support is part of Root Complex properties,
@@ -124,7 +124,7 @@ Several opcodes indicate *ETW* support.
    pci!PciProcessNewRootBus+0x178:
    cmp     dword ptr [pci!EntryReg+0x18 (fffff807194fc0c8)],5
 
-   dword ptr [pci!EntryReg+0x18 (fffff807194fc0c8)],5
+   cmp     dword ptr [pci!EntryReg+0x18 (fffff807194fc0c8)],5
    jbe     pci!PciStartHotPlugController+0x17b (fffff807194ec56f)
    pci!PciStartHotPlugController+0x84:
    call    pci!TlgKeywordOn (fffff807194e391c)
