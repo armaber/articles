@@ -18,7 +18,7 @@ This excerpt represents the bulk:
 * `ACPI\PNP0A08` root complexes are enumerated on UEFI systems. Legacy `ACPI\PNP0A03`
   are not represented.
 
-For each device, be it *ACPI* root complex, PCIe switch or endpoint, a number of properties
+For each device, be it root complex, PCIe switch or endpoint, a number of properties
 are displayed. The console options `-AsVT` or `-AsText` do not show the *driver stack*.
 
 The script requires powershell 5.0 *Desktop* edition. `GetDeviceProperties` method is not
@@ -30,11 +30,8 @@ it can be replaced with `Get-PnPDeviceProperty` cmdlet and have full support for
         @{ Name="BARs";
         Expression={ $id = $_.DeviceID; ($ba | Where-Object { $_.DeviceID -eq $id }).BAR }
         },
-        @{ Name="Service";
-        Expression={ if ($_.Service) { $_.Service } else {
-                    $_.GetDeviceProperties("DEVPKEY_Device_DriverInfSection").deviceProperties.Data
-                }
-            }
+        @{ Name="Parent";
+        Expression={ $_.GetDeviceProperties("DEVPKEY_Device_Parent").deviceProperties.Data }
         };
 ```
 
@@ -94,7 +91,7 @@ are padded.
 
 `-AsHTML` cli switch is fully fledged: driver stack, NUMA node, problem code linked
 to documentation, number of processor packages are among the properties being displayed.
-*"Native hot-plug interrupts granted by firmware"* indicates platform support for adapter
+*&quot;Native hot-plug interrupts granted by firmware&quot;* indicates platform support for adapter
 hot remove/add.
 
 ```powershell
@@ -121,9 +118,12 @@ Notes
 * Large PCIe hierarchy with hundreds of devices takes 20+ seconds to be shown. A progress
   bar yields the devices enumerated until completion.
 * `-AsVT` output can have its information stream redirected to a file. Coloring is
-  preserved:
+  preserved.
 
 ```powershell
-    .\PCITree.ps1 -AsVT 6>results.txt;
+    Invoke-Command (Get-PSSession) {
+        .\PCITree.ps1 -AsVT 6>C:\results.txt;
+    }
+    Copy-Item -FromSession (Get-PSSession) C:\results.txt
     Get-Content results.txt;
 ```
