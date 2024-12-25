@@ -1,14 +1,14 @@
 PCIe Hot Plug on Windows
 ===
 
-*Though the OS supports PCIe hot plug, on-premise indicators are incomplete.
-A method to establish system support for hot plug is put forward.*
+*Though the OS supports PCIe hot plug, on-premise indicators are sparsely specified.
+A method to ascertain system support is put forward.*
 
 * In Device Manager, hot plug support is part of Root Complex properties,
 PCIExpressNativeHotPlugControl. If it is absent, then the platform does not
 grant *native hot plug*.
 
-~~~
+~~~powershell
    PS > (
             Get-PnpDevice -InstanceId "ACPI\PNP0A08*" | Get-PnpDeviceProperty 
             DEVPKEY_PciRootBus_PCIExpressNativeHotPlugControl |
@@ -36,12 +36,12 @@ Use `!amli find _OSC` and look at the 1<sup>st</sup> entry, as a child of
    \_SB._OSC
    0: kd> !amli dns /v \_SB.PCI0._HID
    Integer(_HID:Value=0x00000000080ad041[134926401])
-   0: kd> !amli dns /v \_SB.PCI0.SUPP
-   ACPI Name Space: \_SB.PCI0.SUPP (ffffbb0e1bf6e330)
-   Integer(SUPP:Value=0x000000000000001f[31])
    0: kd> !amli dns /v \_SB.PCI0.CTRL
    ACPI Name Space: \_SB.PCI0.CTRL (ffffbb0e1bf6e3e0)
    Integer(CTRL:Value=0x0000000000000015[21])
+   0: kd> !amli dns /v \_SB.PCI0.SUPP
+   ACPI Name Space: \_SB.PCI0.SUPP (ffffbb0e1bf6e330)
+   Integer(SUPP:Value=0x000000000000001f[31])
 ~~~
 
 \_OSC method suffers minor changes between processor generations. Within a generation,
@@ -68,7 +68,7 @@ The OS registers interrupt handlers for root port or downstream port.
    Dumping IDT: fffff8070701e000
    50: pci!ExpressRootPortMessageRoutine (KINTERRUPT ffffa7016b711a00)
    51: pci!ExpressDownstreamSwitchPortInterruptRoutine (KINTERRUPT ffffa7016b711000)
-   ...
+
    60: pci!ExpressRootPortMessageRoutine (KINTERRUPT ffffa7016b711b40)
    61: pci!ExpressDownstreamSwitchPortInterruptRoutine (KINTERRUPT ffffa7016bfd6dc0)
 ~~~
@@ -80,16 +80,16 @@ Algorithm
 
 Hot plug is handled by the ISR, DPC and collateral timer for error handling. Overview:
 
-~~~
+~~~c
    if (!SlotControl.HotPlugInterruptEnable) {
       return;
    }
    if (SlotControl.PresenceDetectEnable && SlotStatus.PresenceDetectChanged) {
       W1TC(SlotStatus.PresentDetectChanged);
       if (SlotStatus.PresenceDetectState) {
-         call nt!IoInvalidateDeviceRelations;
+         IoInvalidateDeviceRelations(Pdo)
       } else {
-         call nt!IoRequestDeviceEjectEx;
+         IoRequestDeviceEjectEx(ChildPdo);
       }
    }
 ~~~
@@ -97,12 +97,12 @@ Hot plug is handled by the ISR, DPC and collateral timer for error handling. Ove
 With `IoInvalidateDeviceRelations`, the PnP manager issues `IRP_MN_QUERY_DEVICE_RELATIONS`
 on the port. The PCI driver rescans the bus, creates a new device object.
 
-~~~
+~~~asm
    pci!PciBus_QueryDeviceRelations
       pci!PciScanBus
          pci!PciProcessNewDevice
-            lock xadd dword ptr [pci!PciDeviceSequenceNumber (fffff807`194fc250)],r9d
-            lea  r8,[pci!`string' (fffff807`194f3af0)] = "\Device\NTPNP_PCI%04d"
+            lock xadd dword ptr [pci!PciDeviceSequenceNumber],r9d
+            lea  r8,[pci!`string' (fffff807194f3af0)] = "\Device\NTPNP_PCI%04d"
             nt!IoCreateDevice
 ~~~
 
@@ -111,34 +111,34 @@ Tracing
 
 Several opcodes indicate *ETW* support.
 
-~~~
+~~~asm
    pci!PciDevice_Start+0x13a93:
-   fffff807`1951e423 833d9edcfdff05  cmp     dword ptr [pci!EntryReg+0x18 (fffff807`194fc0c8)],5
-   fffff807`1951e42a 0f86c8000000    jbe     pci!PciDevice_Start+0x13b68 (fffff807`1951e4f8)
+   cmp     dword ptr [pci!EntryReg+0x18 (fffff807194fc0c8)],5
+   jbe     pci!PciDevice_Start+0x13b68 (fffff8071951e4f8)
    pci!PciDevice_Start+0x13aa0:
-   fffff807`1951e430 e8e754fcff      call    pci!TlgKeywordOn (fffff807`194e391c)
-   ...
+   call    pci!TlgKeywordOn (fffff807194e391c)
+
    pci!PciPreScanAssignBusNumbersSubtree+0x58:
-   fffff807`1952e558 833d69dbfcff05  cmp     dword ptr [pci!EntryReg+0x18 (fffff807`194fc0c8)],5
-   ...
+   cmp     dword ptr [pci!EntryReg+0x18 (fffff807194fc0c8)],5
+
    pci!PciProcessNewRootBus+0x178:
-   fffff807`19514d74 833d4d73feff05  cmp     dword ptr [pci!EntryReg+0x18 (fffff807`194fc0c8)],5
-   ...
-   fffff807`194ec46b 833d56fc000005  cmp     dword ptr [pci!EntryReg+0x18 (fffff807`194fc0c8)],5
-   fffff807`194ec472 0f86f7000000    jbe     pci!PciStartHotPlugController+0x17b (fffff807`194ec56f)
+   cmp     dword ptr [pci!EntryReg+0x18 (fffff807194fc0c8)],5
+
+   dword ptr [pci!EntryReg+0x18 (fffff807194fc0c8)],5
+   jbe     pci!PciStartHotPlugController+0x17b (fffff807194ec56f)
    pci!PciStartHotPlugController+0x84:
-   fffff807`194ec478 e89f74ffff      call    pci!TlgKeywordOn (fffff807`194e391c)
+   call    pci!TlgKeywordOn (fffff807194e391c)
 ~~~
 
 The `logman.exe start -p <GUID>` that can be used is undocumented.
 
-~~~
+~~~asm
    0: kd> uf pci!TraceLoggingRegisterEx
-   fffff807`1951c3b1 488b0518fdfdff  mov     rax,qword ptr [pci!EntryReg+0x20 (fffff807`194fc0d0)]
-   fffff807`1951c3d0 488d4c2420      lea     rcx,[rsp+20h]
-   fffff807`1951c3d5 0f1040f0        movups  xmm0,xmmword ptr [rax-10h]
-   fffff807`1951c3e1 f30f7f442420    movdqu  xmmword ptr [rsp+20h],xmm0
-   fffff807`1951c3ee e80d37baea      call    nt!EtwRegister (fffff807`040bfb00)
+   mov     rax,qword ptr [pci!EntryReg+0x20 (fffff807194fc0d0)]
+   lea     rcx,[rsp+20h]
+   movups  xmm0,xmmword ptr [rax-10h]
+   movdqu  xmmword ptr [rsp+20h],xmm0
+   call    nt!EtwRegister (fffff807040bfb00)
 
    0: kd> dt nt!_GUID poi(pci!EntryReg+0x20)-0x10
    {69a770dd-1cdb-46c0-91c9-cd2a9b76e061}
@@ -149,10 +149,10 @@ Automation
 
 [NativeHotPlugSupport.ps1](https://github.com/armaber/scripts/blob/main/NativeHotPlugSupport/NativeHotPlugSupport.ps1) shows:
 
-1. ACPI \_OSC implementation, SUPP and CTRL values
-2. hot plug ISRs in the interrupt descriptor table
-3. device objects that connect the interrupt
-4. CPU name and model
+* ACPI \_OSC implementation, CTRL and SUPP values
+* Hot plug ISRs in the interrupt descriptor table
+* Device objects associated with ISRs
+* CPU name and model
 
 ~~~
    PS > .\NativeHotPlugSupport.ps1 -Path .\MEMORY.DMP
@@ -212,25 +212,25 @@ Automation
    Integer(CTRL:Value=0x0000000000000015[21])
    
    50: pci!ExpressRootPortMessageRoutine (KINTERRUPT ffffa7016b711a00)
-   PDO Extension, Bus 0x0, Device 1b, Function 6.
+   Location: Bus 0x0, Device 1b, Function 6.
      DevObj 0xffffbb0e1c7f8060  Parent FDO DevExt 0xffffbb0e1aa04a30
      Vendor ID 8086 (INTEL CORPORATION)  Device ID A32E
      Subsystem Vendor ID 8086 (INTEL CORPORATION)  Subsystem ID 7270
    
    51: pci!ExpressDownstreamSwitchPortInterruptRoutine (KINTERRUPT ffffa7016b711000)
-   PDO Extension, Bus 0x2e, Device 0, Function 0.
+   Location: Bus 0x2e, Device 0, Function 0.
      DevObj 0xffffbb0e1c9b4570  Parent FDO DevExt 0xffffbb0e1c9064c0
      Vendor ID 10b5 (PLX TECHNOLOGY, INC.)  Device ID 8724
      Subsystem Vendor ID 10b5 (PLX TECHNOLOGY, INC.)  Subsystem ID 8724
    
    60: pci!ExpressRootPortMessageRoutine (KINTERRUPT ffffa7016b711b40)
-   PDO Extension, Bus 0x0, Device 1b, Function 0.
+   Location: Bus 0x0, Device 1b, Function 0.
      DevObj 0xffffbb0e1c7f7060  Parent FDO DevExt 0xffffbb0e1aa04a30
      Vendor ID 8086 (INTEL CORPORATION)  Device ID A32C
      Subsystem Vendor ID 8086 (INTEL CORPORATION)  Subsystem ID 7270
    
    61: pci!ExpressDownstreamSwitchPortInterruptRoutine (KINTERRUPT ffffa7016bfd6dc0)
-   PDO Extension, Bus 0x2e, Device 1, Function 0.
+   Location: Bus 0x2e, Device 1, Function 0.
      DevObj 0xffffbb0e1c9b5730  Parent FDO DevExt 0xffffbb0e1c9064c0
      Vendor ID 10b5 (PLX TECHNOLOGY, INC.)  Device ID 8724
      Subsystem Vendor ID 10b5 (PLX TECHNOLOGY, INC.)  Subsystem ID 8724
@@ -246,12 +246,13 @@ Notes
   hot plug support.
 * Escalation accounts for **ACPI \_OSC** method and **CTRL** value for the host bridge,
   part of the root complex.
+* Script processing takes 40+ seconds, mostly spent in *!amli*.
 * ETW traces can be enabled with **{69a770dd-1cdb-46c0-91c9-cd2a9b76e061}** provider.
 * To locate the root or downstream ports that own the hot plug interrupt, dump the IDT,
   match the **KINTERRUPT&#8594;ConnectionData&#8594;Vectors[0].ControllerInput.Gsiv**
   with **!arbiter 4**
 
-~~~
+~~~powershell
    PS > $prefix = "https://raw.githubusercontent.com/armaber/scripts/refs/heads/main/";
         "Detect_OSC.js", "NativeHotPlugSupport.ps1" | foreach {
             Invoke-WebRequest $prefix/NativeHotPlugSupport/$PSItem -OutFile $PSItem;
