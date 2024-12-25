@@ -2,7 +2,7 @@ PCIe Hot Plug on Windows
 ===
 
 *Though the OS supports PCIe hot plug, on-premise indicators are incomplete.
-A method to establish if the system supports hot plug is put forward.*
+A method to establish system support for hot plug is put forward.*
 
 * In Device Manager, hot plug support is part of Root Complex properties,
 PCIExpressNativeHotPlugControl. If it is absent, then the platform does not
@@ -10,7 +10,7 @@ grant *native hot plug*.
 
 ~~~
    PS > (
-            Get-PnPDevice -InstanceId "ACPI\PNP0A08*" | Get-PnpDeviceProperty 
+            Get-PnpDevice -InstanceId "ACPI\PNP0A08*" | Get-PnpDeviceProperty 
             DEVPKEY_PciRootBus_PCIExpressNativeHotPlugControl |
             Where-Object { $_.Data }
         ).InstanceId
@@ -18,8 +18,8 @@ grant *native hot plug*.
 
 At startup, the OS feeds the *supported and controlled PCIe* features to the
 **ACPI \_OSC method**. System firmware responds with a bitmask for granted
-features, part of *Control* field. *See Section 4.5 / PCI Firmware
-Specification Revision 3.2.*
+features, part of *Control* field. *Section 4.5 / PCI Firmware Specification
+Revision 3.2.*
 
 * In kernel mode, the root complex fully qualified name must be identified.
 Use `!amli find _OSC` and look at the 1<sup>st</sup> entry, as a child of
@@ -44,10 +44,11 @@ Use `!amli find _OSC` and look at the 1<sup>st</sup> entry, as a child of
    Integer(CTRL:Value=0x0000000000000015[21])
 ~~~
 
-Many implementations of the **\_OSC** method are invariable.
+\_OSC method suffers minor changes between processor generations. Within a generation,
+there are *use conditions* that demand different implementation.
 
-*Intel maintains a compact firmware implementation through [slimbootloader](https://slimbootloader.github.io/supported-hardware/index.html) project.
-The \_OSC method is implemented in **HostBus.asl** for each CPU platform.*
+Intel maintains a compact firmware implementation through [slimbootloader](https://slimbootloader.github.io/supported-hardware/index.html) project. The \_OSC method is implemented in **HostBus.asl** for each CPU
+platform.
 
 **CTRL** ACPI variable shows the granted access from firmware to OS. Bit 0
 represents
@@ -154,7 +155,7 @@ Automation
 4. CPU name and model
 
 ~~~
-   PS > & '.\NativeHotPlugSupported.ps1' -Path .\MEMORY.DMP
+   PS > .\NativeHotPlugSupport.ps1 -Path .\MEMORY.DMP
    ffffbb0e1bf6e6b2:[\_SB.PCI0._OSC]
    ffffbb0e1bf6e6b2 : Store(Arg3, Local0)
    ffffbb0e1bf6e6b5 : CreateDWordField(Local0, Zero, CDW1)
@@ -238,7 +239,7 @@ Automation
    Identifier = REG_SZ Intel64 Family 6 Model 158 Stepping 10
 ~~~
 
-Summary
+Notes
 -
 
 * IT personnel can use **DEVPKEY_PciRootBus_PCIExpressNativeHotPlugControl** to reveal
