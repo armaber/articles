@@ -4,8 +4,8 @@ PCIe Hot Plug on Windows
 *While the OS supports PCIe hot plug, on-premise indicators are sparsely specified.
 A method to ascertain system support is put forward.*
 
-* In Device Manager, hot plug support is part of Root Complex properties,
-PCIExpressNativeHotPlugControl. If it is absent, then the platform does not
+* In Device Manager, hot plug support is part of Root Complex details,
+`PCI express bus native hot plug control`. If it is absent, then the platform does not
 grant *native hot plug*.
 
 ~~~powershell
@@ -45,7 +45,7 @@ Use `!amli find _OSC` and look at the 1<sup>st</sup> entry, as a child of
 ~~~
 
 \_OSC method suffers minor changes between processor generations. Within a generation,
-there are *use conditions* that demand different implementation.
+there are market or environmental *use conditions* with specific implementations.
 
 Intel maintains a compact firmware implementation through [slimbootloader](https://slimbootloader.github.io/supported-hardware/index.html) project. The \_OSC method is implemented in **HostBus.asl** for each CPU
 platform.
@@ -87,7 +87,7 @@ Hot plug is handled by the ISR, DPC and collateral timer for error handling. Ove
    if (SlotControl.PresenceDetectEnable && SlotStatus.PresenceDetectChanged) {
       W1TC(SlotStatus.PresentDetectChanged);
       if (SlotStatus.PresenceDetectState) {
-         IoInvalidateDeviceRelations(Pdo)
+         IoInvalidateDeviceRelations(Pdo);
       } else {
          IoRequestDeviceEjectEx(ChildPdo);
       }
