@@ -73,8 +73,6 @@ The OS registers interrupt handlers for root port or downstream port.
    61: pci!ExpressDownstreamSwitchPortInterruptRoutine (KINTERRUPT ffffa7016bfd6dc0)
 ~~~
 
-The absence of these interrupts indicates lack of hot plug support.
-
 Algorithm
 -
 
