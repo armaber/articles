@@ -21,9 +21,9 @@ This excerpt represents the bulk:
 For each device, be it root complex, PCIe switch or endpoint, a number of properties
 are displayed. The console options `-AsVT` or `-AsText` do not show the *driver stack*.
 
-The script requires powershell 5.0 *Desktop* edition. `GetDeviceProperties` method is not
-available under *pwsh.exe* *Core* with `Get-CimInstance`. At the expense of a performance penalty,
-it can be replaced with `Get-PnPDeviceProperty` cmdlet and have full support for *Core*.
+The script requires powershell 5.0 *Desktop* edition. At the expense of a performance
+penalty, `Get-WmiObject` can be replaced with `Get-CimInstance` and `Get-PnPDeviceProperty`
+to obtain full support for `pwsh.exe` *Core*.
 
 ```powershell
     $ret = $ap | Select-Object `
@@ -37,13 +37,8 @@ it can be replaced with `Get-PnPDeviceProperty` cmdlet and have full support for
 
 An element in the hierarchy has one `DEVPKEY_Device_Parent`, multiple `Descendant`s.
 Before computing the descendants, the list is sorted by BDF, then ACPI root complexes
-are given priority:
-
-* *BDF* sort can place the RC at random indexes among PCIe devices with same `0:0.0`
-  location.
-
-On systems with multiple root complexes, the device ID has a hexadecimal suffix next
-to `ACPI\PNP0A08\`. Sorting by suffix keeps the tree representation consistent.
+are given priority. RCs themselves are sorted by `ACPI\PNP0A08\<suffix>` to keep the
+tree representation consistent.
 
 ```powershell
     $List.Value = $List.Value | Sort-Object BDF;
@@ -57,9 +52,7 @@ to `ACPI\PNP0A08\`. Sorting by suffix keeps the tree representation consistent.
 ```
 
 *Base address registers* are computed with `CM_Get_First_Log_Conf` and `CM_Get_Res_Des_Data`
-Win32APIs.
-
-* `Win32_PnPAllocatedResource, Win32_DeviceMemoryAddress` associators lead to noise:
+Win32APIs. `Win32_PnPAllocatedResource, Win32_DeviceMemoryAddress` associators lead to noise:
   the BARs are not unique, 64-bit BARs are truncated to 32-bit.
 
 For brevity, `MEM_RESOURCE` structure is marked as *unsafe*: `MD_Alloc_Base`, `MD_Alloc_End`
@@ -91,8 +84,8 @@ are padded.
 
 `-AsHTML` cli switch is fully fledged: driver stack, NUMA node, problem code linked
 to documentation, number of processor packages are among the properties being displayed.
-*&quot;Native hot-plug interrupts granted by firmware&quot;* indicates platform support for adapter
-hot remove/add.
+*&quot;Native hot-plug interrupts granted by firmware&quot;* indicates platform support
+for adapter hot remove/add.
 
 ```powershell
     ImportNative;
