@@ -18,4 +18,4 @@ constant on Windows, applications adjust it at will.
 - [NativeHotPlug](./PCIeHP/notes.md): Windows and ACPI support for PCIe hot plug.
 
 Upcoming:
-- *HeavyDutyUF*: disassemble the kernel to build a call tree for a chosen symbol.
+- *[HeavyDutyUF](./HDUF/brief.md)*: disassemble the kernel to build a call tree for a chosen symbol.
