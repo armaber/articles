@@ -15,7 +15,7 @@ specifying `-Depth`:
 `$StopDisassembly` is a table of symbols where parsing stops. For example, `KeYieldProcessorEx`
 calls other functions that are minute.
 
-[Sample Output](https://github.com/armaber/scripts/tree/disasm/DisassembleImage/SampleOutput.txt)
+[Sample Output](https://raw.githubusercontent.com/armaber/scripts/refs/heads/disasm/DisassembleImage/SampleOutput.txt)
 builds the call tree for `nt!KiSystemStartup`.
 
 ~~~
