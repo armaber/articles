@@ -4,19 +4,34 @@ Disassemble Memory File
 *Memory.DMP used in post-mortem debugging can be processed without "Debugging Tools for Windows",
 particularly to obtain a call tree for a given function.*
 
-[UfSymbol.ps1](https://github.com/armaber/scripts/tree/disasm/DisassembleImage/UfSymbol.ps1)
-disassembles once a memory file and stores the output in local directory. A 2<sup>nd</sup> run
-uses the `.disassembly` file to parse the functions' body. The root body contains the symbol
+~~~
+uf nt!HalGetBusDataByOffset
+├─────────────────────────▷uf nt!HalpGetPCIData
+│                                              uf nt!HalpReadPCIConfig
+│                                              uf nt!memcpy
+│                                              uf nt!_security_check_cookie
+└─────────────────────────▷uf nt!HalpGetSetCmosData
+                                                   uf nt!HalpAcquireCmosSpinLock
+                                                   uf nt!guard_dispatch_icall (N/A)
+~~~
+
+[*UfSymbol.ps1*](https://github.com/armaber/scripts/tree/disasm/DisassembleImage/UfSymbol.ps1)
+operates by storing the disassembly on a local database. The 1<sup>st</sup> time it is invoked,
+a parallel decompilation of the image takes place.
+
+The disassembly is separated into individual function bodies. The root body contains the symbol
 requested by the user. A dependency graph is built either upstream, representing all the
 callers of the function, or downstream representing the callees. Care must be taken when
 specifying `-Depth`:
-* generic functions have many callers
 
-`$StopDisassembly` is a table of symbols where parsing stops. For example, `KeYieldProcessorEx`
-calls other functions that are minute.
+* generic functions have many callers; ie. 1118 matches for `nt!KeBugCheckEx` at `-Depth 1`.
 
-[Sample Output](https://raw.githubusercontent.com/armaber/scripts/refs/heads/disasm/DisassembleImage/SampleOutput.txt)
-builds the call tree for `nt!KiSystemStartup`.
+`$StopDisassembly` is a symbol table where parsing stops: `KeYieldProcessorEx`
+calls other functions that are minute, `memset`, `atoi`, `KeStallExecutionProcessor`,
+`IofCompleteRequest` are not explored.
+
+[Sample](https://raw.githubusercontent.com/armaber/scripts/refs/heads/disasm/DisassembleImage/SampleOutput.txt)
+output builds the call tree for `nt!KiSystemStartup`.
 
 ~~~
 PS > (Measure-Command {
@@ -29,19 +44,18 @@ D:\Processing\53c6f2af-38db-4219-9f41-f794c7897f5a\53c6f2af-38db-4219-9f41-f794c
 D:\Processing\53c6f2af-38db-4219-9f41-f794c7897f5a\53c6f2af-38db-4219-9f41-f794c7897f5a.retpoline
 ~~~
 
-The 1<sup>st</sup> line gives a heads-up about the disassembly duration:
+The 1<sup>st</sup> line gives a heads-up about the disassembly duration: a smaller file
+was processed in 1.26 hours on the same system.
 
-* a smaller file was processed in 1.26 hours on the same system.
+The decompilation is done in parallel using all cores but 1. Once completed, the `.meta`
+file contains:
 
-The disassembly is done in parallel using all cores but 1. Once completed, the `.meta`
-file contains the properties:
-
-* OS and Computer where the BSOD occurred
-* Image path and Hash. The hash identifies image duplicates, resulting in a disassembly
+* *OS* and *computer* where the BSOD occurred
+* *image* path and *hash*. The hash identifies duplicates, resulting in a decompilation
   bypass.
-* System where disassembly took place, number of CPUs alloted, CPU model, duration and
-  Image size.
-* The default modules used to disassemble the Image:
+* *system* where disassembly took place, number of *cpus* alloted, cpu *model*, *duration* and
+  image *size*.
+* The default modules used to disassemble the image:
    * for a `.dmp` file *nt, pci, acpi and hal* functions are disassembled
    * *base name* for all others
 
@@ -49,12 +63,11 @@ The `.retpoline` file is an indirection table for bodies compiled with `/guard:c
 Wherever `call nt!guard_dispatch_icall` is found, the function pointer is resolved in
 the memory file and displayed.
 
-Back to `KiSystemStartup` call tree:
+For `nt!KiSystemStartup` call tree:
 
-* 1302 callees are identified for `-Depth 4`
-* Complete disassembly and identification took **5215** seconds on an "Intel(R)
+* 1302 callees are identified with `-Depth 4`
+* Complete decompilation and identification took **5215** seconds on an "Intel(R)
   Core(TM) i3-7100U CPU @ 2.40GHz" with 3 cpus.
-* `nt!atol`, `nt!KeQueryPerformanceCounter` can be part of `$StopDisassembly`.
 
 ~~~
 uf nt!KdInitSystem
@@ -81,10 +94,13 @@ uf nt!guard_dispatch_icall (nt!_security_cookie
 Notes
 ---
 
+* Decompilation-ready processing is useful in support cases where the *Memory.DMP*
+  file cannot be provided. Implementation differences between OS versions are also
+  visible.
 * PowerShell *Core* is required. *Desktop 5.1* is slow.
 * `.retpoline` built is not parallelized.
 * SVG rendering is not implemented.
-* *UfSymbol* is meant for USB migration; the tool can run without internet.
+* *UfSymbol* is meant for USB migration. No internet connection is necessary.
 * Removing CR character from the large disassembly can result in *OutOfMemory* exception.
 
 ~~~powershell
