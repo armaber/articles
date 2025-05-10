@@ -101,11 +101,9 @@ Notes
 * `.retpoline` built is not parallelized.
 * SVG rendering is not implemented.
 * *UfSymbol* is meant for USB migration. No internet connection is necessary.
-* Removing CR character from the large disassembly can result in *OutOfMemory* exception.
-* Some symbols might not be identified if the image is a *Memory.DMP* file. Decompilation
-  hits `uint16_t` zeroed memory which coincides with an opcode. The runspace is not killed
-  by the *OutOfMemory* exception; other side effects can occur. This shortcoming is being
-  addressed.
+* High-level `Get-Content -First` input objects can propel the *working set*
+  to 10+ Gb. With *StreamReader* and *StringBuilder* as proper replacements,
+  there is no need for GC.
 
 ~~~powershell
    PS > $prefix = "https://raw.githubusercontent.com/armaber/scripts/refs/heads/disasm/";
