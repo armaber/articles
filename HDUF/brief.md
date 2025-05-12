@@ -16,13 +16,10 @@ uf nt!HalGetBusDataByOffset
 ~~~
 
 [*UfSymbol.ps1*](https://github.com/armaber/scripts/tree/disasm/DisassembleImage/UfSymbol.ps1)
-operates by storing the disassembly on a local database. The 1<sup>st</sup> time it is invoked,
-a parallel decompilation of the image takes place.
-
-The disassembly is separated into individual function bodies. The root body contains the symbol
-requested by the user. A dependency graph is built either upstream, representing all the
-callers of the function, or downstream representing the callees. Care must be taken when
-specifying `-Depth`:
+operates by storing the disassembly on a local database. The disassembly is separated into
+individual function bodies. The root body contains the symbol requested by the user. A
+dependency graph is built either upstream, representing all the callers of the function,
+or downstream representing the callees. Care must be taken when specifying `-Depth`:
 
 * generic functions have many callers; ie. 1118 matches for `nt!KeBugCheckEx` at `-Depth 1`.
 
@@ -47,8 +44,7 @@ D:\Processing\53c6f2af-38db-4219-9f41-f794c7897f5a\53c6f2af-38db-4219-9f41-f794c
 The 1<sup>st</sup> line gives a heads-up about the disassembly duration: a smaller file
 was processed in 1.26 hours on the same system.
 
-The decompilation is done in parallel using all cores but 1. Once completed, the `.meta`
-file contains:
+All cores but 1 execute the decompilation. Once completed, the `.meta` file contains:
 
 * *OS* and *computer* where the BSOD occurred
 * *image* path and *hash*. The hash identifies duplicates, resulting in a decompilation
@@ -65,7 +61,7 @@ the memory file and displayed.
 
 For `nt!KiSystemStartup` call tree:
 
-* 1302 callees are identified with `-Depth 4`
+* 1302 callees are identified with `-Depth 4`, 5318 at depth 6.
 * Complete decompilation and identification took **5215** seconds on an "Intel(R)
   Core(TM) i3-7100U CPU @ 2.40GHz" with 3 cpus.
 
@@ -91,23 +87,36 @@ uf nt!guard_dispatch_icall (nt!_security_cookie
 5215.506918
 ~~~
 
+`-Setup` is a text based guide that configures the directory where disassemblies are
+stored. A symbol path can be specified, a lower limit can trigger a warning if other
+dissasemblies overlast it. Disassembly duration and system, cpu model, file size can
+be suppressed from future `.meta` files.
+
 Notes
 ---
 
 * Decompilation-ready processing is useful in support cases where the *Memory.DMP*
   file cannot be provided. Implementation differences between OS versions are also
-  visible.
+  visible. A `.dmp` file contains the dependencies from all modules, can trip the
+  decompiler with inappropriate function bodies. This shortcoming does not apply
+  to user mode. An excutable solves all functions, cannot solve dependencies.
 * PowerShell *Core* is required. *Desktop 5.1* is slow.
-* `.retpoline` built is not parallelized.
-* SVG rendering is not implemented.
-* *UfSymbol* is meant for USB migration. No internet connection is necessary.
-* High-level `Get-Content -First` input objects can propel the *working set*
-  to 10+ Gb. With *StreamReader* and *StringBuilder* as proper replacements,
-  there is no need for GC.
+* Hotpaths are moved to inflight *CSharp* assembly. Decompilation can be **8 times**
+  faster.
+* *UfSymbol* is meant for USB migration. No internet connection is needed.
+* Where `(N/A)` appears in rendering:
+  * the indirection table has no corresponding target symbol - ie. register is used.
+  * the function is missing the body either due to absent module, or a large body
+    has been decompiled and trimmed.
+* `.retpoline` build is not parallelized.
+* The initial objective was GUI rendering through SVG. Now, with broad trees being
+  discovered, a point-and-click is thought to be cumbersome. Console layout satisfies
+  the needs.
 
 ~~~powershell
    PS > $prefix = "https://raw.githubusercontent.com/armaber/scripts/refs/heads/disasm/";
         "functions.ps1", "UfSymbol.ps1" | foreach {
             Invoke-WebRequest $prefix/DisassembleImage/$PSItem -OutFile $PSItem;
          }
+         Get-Help .\UfSymbol.ps1 -Full;
 ~~~
