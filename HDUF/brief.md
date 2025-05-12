@@ -99,7 +99,7 @@ Notes
   file cannot be provided. Implementation differences between OS versions are also
   visible. A `.dmp` file contains the dependencies from all modules, can trip the
   decompiler with inappropriate function bodies. This shortcoming does not apply
-  to user mode. An excutable solves all functions, cannot solve dependencies.
+  to user mode. An executable solves all functions, cannot solve dependencies.
 * PowerShell *Core* is required. *Desktop 5.1* is slow.
 * Hotpaths are moved to inflight *CSharp* assembly. Decompilation can be **8 times**
   faster.
