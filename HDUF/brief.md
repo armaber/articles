@@ -103,20 +103,22 @@ Notes
 * PowerShell *Core* is required. *Desktop 5.1* is slow.
 * Hotpaths are moved to inflight *CSharp* assembly. Decompilation can be **8 times**
   faster.
+* *kd.exe* can be superseded by *dbgeng.dll* COM interfaces. `OpenDumpFile` is part
+  of *IDebugClient*. [This](https://github.com/southpolenator/SharpDebug/blob/next/Source/SharpDebug.DbgEng/DbgEng/Interfaces/IDebugClient.cs#L187)
+  is the v-table offset.
 * *UfSymbol* is meant for USB migration. No internet connection is needed.
 * Where `(N/A)` appears in rendering:
   * the indirection table has no corresponding target symbol - ie. register is used.
   * the function is missing the body either due to absent module, or a large body
     has been decompiled and trimmed.
-* `.retpoline` build is not parallelized.
-* The initial objective was GUI rendering through SVG. Now, with broad trees being
-  discovered, a point-and-click is thought to be cumbersome. Console layout satisfies
-  the needs.
+* `.retpoline` build is not parallelized. Only 2E+3 *poi* sources have to be decoded.
+* The initial objective was GUI rendering through SVG. With broad trees being prevalent,
+  a point-and-click is thought to be cumbersome. Console layout satisfies the needs.
 
 ~~~powershell
    PS > $prefix = "https://raw.githubusercontent.com/armaber/scripts/refs/heads/disasm/";
         "functions.ps1", "UfSymbol.ps1" | foreach {
             Invoke-WebRequest $prefix/DisassembleImage/$PSItem -OutFile $PSItem;
-         }
-         Get-Help .\UfSymbol.ps1 -Full;
+        }
+        Get-Help .\UfSymbol.ps1 -Full;
 ~~~
