@@ -1,8 +1,8 @@
 Disassemble Memory File
 ===
 
-*Memory.DMP used in post-mortem debugging can be processed without "Debugging Tools for Windows",
-particularly to obtain a call tree for a given function.*
+*Memory.DMP can be used to determine call graphs, outside the scope of analysis tools like kd.exe.
+ With a full disassembly, the context around a particular symbol is explored at convenience.*
 
 ~~~
 uf nt!HalGetBusDataByOffset
@@ -16,19 +16,19 @@ uf nt!HalGetBusDataByOffset
 ~~~
 
 [*UfSymbol.ps1*](https://github.com/armaber/scripts/tree/disasm/DisassembleImage/UfSymbol.ps1)
-operates by storing the disassembly on a local database. The disassembly is separated into
-individual function bodies. The root body contains the symbol requested by the user. A
-dependency graph is built either upstream, representing all the callers of the function,
-or downstream representing the callees. Care must be taken when specifying `-Depth`:
+renders the call graph based on a disassembly file. The file is generated once, reused
+at rendering stage. The disassembly is separated into individual function bodies.
+The root body contains the symbol requested by the user. A dependency graph contains
+the callers or the callees for each function. CLI switches determine the depth of the
+tree, target OS for rendering.
 
-* generic functions have many callers; ie. 1118 matches for `nt!KeBugCheckEx` at `-Depth 1`.
+* Generic functions have many callers; ie. 1118 matches for `nt!KeBugCheckEx` at `-Depth 1`.
 
-`$StopDisassembly` is a symbol table where parsing stops: `KeYieldProcessorEx`
-calls other functions that are minute, `memset`, `atoi`, `KeStallExecutionProcessor`,
-`IofCompleteRequest` are not explored.
+To keep the graph uncluttered, known functions are not disassembled: `KeYieldProcessorEx`
+calls other functions that are minute, `IofCompleteRequest`.
 
 [Sample](https://raw.githubusercontent.com/armaber/scripts/refs/heads/disasm/DisassembleImage/SampleOutput.txt)
-output builds the call tree for `nt!KiSystemStartup`.
+output renders the call tree for `nt!KiSystemStartup`.
 
 ~~~
 PS > (Measure-Command {
@@ -41,10 +41,10 @@ D:\Processing\53c6f2af-38db-4219-9f41-f794c7897f5a\53c6f2af-38db-4219-9f41-f794c
 D:\Processing\53c6f2af-38db-4219-9f41-f794c7897f5a\53c6f2af-38db-4219-9f41-f794c7897f5a.retpoline
 ~~~
 
-The 1<sup>st</sup> line gives a heads-up about the disassembly duration: a smaller file
-was processed in 1.26 hours on the same system.
-
-All cores but 1 execute the decompilation. Once completed, the `.meta` file contains:
+The 1<sup>st</sup> line shows an estimate for the minimum disassembly duration: a smaller
+file was processed in 1.26 hours on the same system. The decompilation is executed on all
+cores but 1. Besides the `.disassembly` file, `.meta` and `.retpoline` are created.
+The `.meta` file contains:
 
 * *OS* and *computer* where the BSOD occurred
 * *image* path and *hash*. The hash identifies duplicates, resulting in a decompilation
@@ -56,13 +56,13 @@ All cores but 1 execute the decompilation. Once completed, the `.meta` file cont
    * *base name* for all others
 
 The `.retpoline` file is an indirection table for bodies compiled with `/guard:cf`.
-Wherever `call nt!guard_dispatch_icall` is found, the function pointer is resolved in
+Wherever `call nt!guard_dispatch_icall` is found, the source pointer is resolved in
 the memory file and displayed.
 
 For `nt!KiSystemStartup` call tree:
 
 * 1302 callees are identified with `-Depth 4`, 5318 at depth 6.
-* Complete decompilation and identification took **5215** seconds on an "Intel(R)
+* Complete decompilation and identification takes **5215** seconds on an "Intel(R)
   Core(TM) i3-7100U CPU @ 2.40GHz" with 3 cpus.
 
 ~~~
@@ -97,23 +97,23 @@ Notes
 
 * Decompilation-ready processing is useful in support cases where the *Memory.DMP*
   file cannot be provided. Implementation differences between OS versions are also
-  visible. A `.dmp` file contains the dependencies from all modules, can trip the
-  decompiler with inappropriate function bodies. This shortcoming does not apply
-  to user mode. An executable solves all functions, cannot solve dependencies.
+  visible. 
+    * A `.dmp` file contains the dependencies from all modules, can trip the
+      decompiler with inappropriate function bodies. This shortcoming does not apply
+      to user mode.
+    * An executable solves all functions, cannot solve dependencies.
 * PowerShell *Core* is required. *Desktop 5.1* is slow.
 * Hotpaths are moved to inflight *CSharp* assembly. Decompilation can be **8 times**
   faster.
-* *kd.exe* can be superseded by *dbgeng.dll* COM interfaces. `OpenDumpFile` is part
-  of *IDebugClient*. [This](https://github.com/southpolenator/SharpDebug/blob/next/Source/SharpDebug.DbgEng/DbgEng/Interfaces/IDebugClient.cs#L187)
-  is the v-table offset.
+* Decompilation through *kd.exe* can be superseded by *dbgeng.dll* COM interfaces.
 * *UfSymbol* is meant for USB migration. No internet connection is needed.
 * Where `(N/A)` appears in rendering:
-  * the indirection table has no corresponding target symbol - ie. register is used.
-  * the function is missing the body either due to absent module, or a large body
+  * indirection table has no corresponding target symbol - ie. register is used.
+  * function is missing the body either due to absent module, or a large body
     has been decompiled and trimmed.
 * `.retpoline` build is not parallelized. Only 2E+3 *poi* sources have to be decoded.
-* The initial objective was GUI rendering through SVG. With broad trees being prevalent,
-  a point-and-click is thought to be cumbersome. Console layout satisfies the needs.
+* Initially, the objective was GUI rendering through SVG. With broad trees being
+  prevalent, a point-and-click is deemed impractical.
 
 ~~~powershell
    PS > $prefix = "https://raw.githubusercontent.com/armaber/scripts/refs/heads/disasm/";
