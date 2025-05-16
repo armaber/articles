@@ -1,0 +1,237 @@
+<html lang="en-us">
+<title>Disassemble Memory File</title>
+<head>
+    <style>
+    pre {
+        border-color: black;
+        border-width: 1px;
+        border-style: solid;
+        background-color: whitesmoke;
+        border-radius: 5px;
+        padding: 10px;
+        text-wrap: pretty;
+    }
+    code {
+        font-family: 'Courier New', Courier, monospace;
+        font-size: large;
+    }
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-size: x-large;
+    }
+    table {
+        border-spacing: 0;
+    }
+    th, td, h1, h2 {
+        border-bottom: 1px solid black;
+    }
+    th, td {
+        padding: 4px;
+        border-left: 1px solid black;
+    }
+    blockquote {
+        font-style: italic;
+        margin-left: 15px;
+        margin-right: 15px;
+        border-left: 2px solid black;
+        padding-left: 5px;
+        padding-right: 5px;
+    }
+    .odd {
+        background-color: whitesmoke;
+    }
+    </style>
+</head>
+<body><h1 id="disassemble-memory-file">Disassemble Memory File</h1>
+<p><em>Memory.DMP can be used to determine call graphs, outside the
+scope of analysis tools like kd.exe. With a full disassembly, the
+context around a particular symbol is conveniently explored.</em></p>
+<pre><code>uf nt!HalGetBusDataByOffset
+├─────────────────────────▷uf nt!HalpGetPCIData
+│                                              uf nt!HalpReadPCIConfig
+│                                              uf nt!memcpy
+│                                              uf nt!_security_check_cookie
+└─────────────────────────▷uf nt!HalpGetSetCmosData
+                                                   uf nt!HalpAcquireCmosSpinLock
+                                                   uf nt!guard_dispatch_icall (N/A)</code></pre>
+<p><a
+href="https://github.com/armaber/scripts/tree/disasm/DisassembleImage/UfSymbol.ps1">UfSymbol.ps1</a>
+renders the call graph based on a disassembly file. The file is
+generated once, reused at rendering stage. The disassembly is separated
+into individual function bodies. The root body contains the symbol
+requested by the user. A dependency graph contains the callers or the
+callees for each function. CLI switches determine the depth of the tree,
+target OS for rendering.</p>
+<ul>
+<li>Generic functions have many callers; ie. 1118 matches for
+<code>nt!KeBugCheckEx</code> at <code>-Depth 1</code>.</li>
+</ul>
+<p>To keep the graph uncluttered, known functions are not disassembled:
+<code>KeYieldProcessorEx</code> calls other functions that are minute,
+<code>IofCompleteRequest</code>.</p>
+<p><a
+href="https://raw.githubusercontent.com/armaber/scripts/refs/heads/disasm/DisassembleImage/SampleOutput.txt">Sample</a>
+output renders the call tree for <code>nt!KiSystemStartup</code>.</p>
+<pre><code>PS &gt; (Measure-Command {
+         $Image = &#39;D:\DataLake\2025-04-28\MEMORY.DMP&#39;
+         &amp; &#39;.\UfSymbol.ps1&#39; -Symbol nt!KiSystemStartup -Image $Image -Depth 4 -Down | Out-Default
+      }).TotalSeconds
+File &quot;D:\DataLake\2025-01-28\MEMORY.DMP&quot; of 1194.36 Mb has been processed in 4570 seconds.
+D:\Processing\53c6f2af-38db-4219-9f41-f794c7897f5a\53c6f2af-38db-4219-9f41-f794c7897f5a.disassembly
+D:\Processing\53c6f2af-38db-4219-9f41-f794c7897f5a\53c6f2af-38db-4219-9f41-f794c7897f5a.meta
+D:\Processing\53c6f2af-38db-4219-9f41-f794c7897f5a\53c6f2af-38db-4219-9f41-f794c7897f5a.retpoline</code></pre>
+<p>The 1<sup>st</sup> line shows an estimate for the minimum disassembly
+duration: a smaller file was processed in 1.26 hours on the same system.
+The decompilation is executed on all cores but 1. Besides the
+<code>.disassembly</code> file, <code>.meta</code> and
+<code>.retpoline</code> are created. The <code>.meta</code> file
+contains:</p>
+<ul>
+<li><em>OS</em> and <em>computer</em> where the BSOD occurred</li>
+<li><em>image</em> path and <em>hash</em>. The hash identifies
+duplicates, resulting in a decompilation bypass.</li>
+<li><em>system</em> where disassembly took place, number of
+<em>cpus</em> alloted, cpu <em>model</em>, <em>duration</em> and image
+<em>size</em>.</li>
+<li>The default modules used to disassemble the image:
+<ul>
+<li>for a <code>.dmp</code> file <em>nt, pci, acpi and hal</em>
+functions are disassembled</li>
+<li><em>base name</em> for all others</li>
+</ul></li>
+</ul>
+<p>The <code>.retpoline</code> file is an indirection table for bodies
+compiled with <code>/guard:cf</code>. Wherever
+<code>call nt!guard_dispatch_icall</code> is found, the source pointer
+is resolved in the memory file and displayed.</p>
+<p>For <code>nt!KiSystemStartup</code> call tree:</p>
+<ul>
+<li>1302 callees are identified with <code>-Depth 4</code>, 5318 at
+depth 6.</li>
+<li>Complete decompilation and identification takes
+<strong>5215</strong> seconds on an “Intel(R) Core(TM) i3-7100U CPU @
+2.40GHz” with 3 cpus.</li>
+</ul>
+<pre><code>uf nt!KdInitSystem
+├────────────────▷uf nt!KeQueryPerformanceCounter
+│                                                uf nt!HalpTimerGetInternalData
+│                                                uf nt!HalpTimerScaleCounter
+│                 uf nt!ExAllocatePool2
+│                 uf nt!_security_check_cookie
+│                 uf nt!MmGetPagedPoolCommitPointer
+├────────────────▷uf nt!KdRegisterDebuggerDataBlock
+...
+uf nt!PpmUpdatePerformanceFeedback
+uf nt!guard_dispatch_icall (nt!_security_cookie
+                            nt!HalpOriginalPerformanceCounter
+                            nt!HalPrivateDispatchTable+0x1b0=nt!HalpProcessorPrepareForIdle
+                            nt!HalPrivateDispatchTable+0x1c0=nt!HalpProcessorResumeFromIdle
+                            nt!HalpTimerReferencePage
+                            nt!HalPrivateDispatchTable+0x418=nt!HalpLbrResumeRecording
+                            nt!HalPrivateDispatchTable+0x2f8=nt!HalpTimerClockStop
+                            nt!PopCsConsumption+0x140)
+5215.506918</code></pre>
+<p><code>-Setup</code> is a text based guide that configures the
+directory where disassemblies are stored. A symbol path can be
+specified, a lower limit can trigger a warning if other dissasemblies
+overlast it. Disassembly duration and system, cpu model, file size can
+be suppressed from future <code>.meta</code> files.</p>
+<h2 id="notes">Notes</h2>
+<ul>
+<li>Decompilation-ready processing is useful in support cases where the
+<em>Memory.DMP</em> file cannot be provided. Implementation differences
+between OS versions are also visible.
+<ul>
+<li>A <code>.dmp</code> file contains the dependencies from all modules,
+can trip the decompiler with inappropriate function bodies. This
+shortcoming does not apply to user mode.</li>
+<li>An executable solves all functions, cannot solve dependencies.</li>
+</ul></li>
+<li>PowerShell <em>Core</em> is required. <em>Desktop 5.1</em> is
+slow.</li>
+<li>Hotpaths are moved to inflight <em>CSharp</em> assembly.
+Decompilation can be <strong>8 times</strong> faster.</li>
+<li>Decompilation through <em>kd.exe</em> can be superseded by
+<em>dbgeng.dll</em> COM interfaces. Direct access to
+<code>dbgeng.h</code> has the benefit of measuring the decompilation
+process through a progress bar. Trimming of function bodies occurs ad
+hoc. Parallel <em>kd.exe</em> execution binds trimming to disassembly
+completion.
+<ul>
+<li><code>IDebugControl::WaitForEvent</code> fails when clients are
+created by multiple threads.
+<details>
+<summary>
+error message
+</summary>
+<pre><code>Can&#39;t set dump file contexts
+MachineInfo::SetContext failed - Thread: 000001A2CDA07900  Handle: 1  Id: 1 - Error == 0x8000FFFF</code></pre>
+</details></li>
+<li><code>IDebugControl::Execute</code> is serialized with a
+<em>critical section</em>.
+<details>
+<summary>
+disassembly
+</summary>
+<pre><code>0:017&gt; k
+# Child-SP          RetAddr               Call Site
+00 00000035`6ed8d300 00007ffa`976b15e0     dbgeng!DebugClient::ExecuteWide+0x23
+01 00000035`6ed8d350 00007ffa`37eccdc5     dbgeng!DebugClient::Execute+0xf0
+
+0:000&gt; uf dbgeng!DebugClient::ExecuteWide
+
+00000001`80101bca 488d0dafe97a00  lea     rcx,[dbgeng!g_EngineLock (00000001`808b0580)]
+00000001`80101bd1 48ff15b0e65600  call    qword ptr [dbgeng!_imp_EnterCriticalSection (00000001`80670288)]
+
+00000001`80101c06 e8990ffdff      call    dbgeng!PushOutCtl (00000001`800d2ba4)
+00000001`80101c23 e8e8f2ffff      call    dbgeng!Execute (00000001`80100f10)
+00000001`80101c2f e81807fdff      call    dbgeng!PopOutCtl (00000001`800d234c)
+00000001`80101c45 e896c2fcff      call    dbgeng!FlushCallbacks (00000001`800cdee0)
+
+00000001`80101c50 488d0d29e97a00  lea     rcx,[dbgeng!g_EngineLock (00000001`808b0580)]
+00000001`80101c57 48ff1512e65600  call    qword ptr [dbgeng!_imp_LeaveCriticalSection (00000001`80670270)]</code></pre>
+</details></li>
+</ul></li>
+<li>Inbox <code>dbgeng.dll</code> <em>10.0.19041.3636</em> identifies
+fewer functions compared with latest <em>10.0.26100.2454</em>
+version.</li>
+<li><em>UfSymbol</em> is meant for USB migration. No internet connection
+is needed.</li>
+<li>Where <code>(N/A)</code> appears in rendering:
+<ul>
+<li>indirection table has no corresponding target symbol - ie. register
+is used.
+<details>
+<summary>
+rax ← qword ptr [rcx+20h]
+</summary>
+<pre><code>uf nt!IoCsqRemoveIrp
+fffff803`2c9d0980 48895c2410      mov     qword ptr [rsp+10h],rbx
+fffff803`2c9d0985 4889742418      mov     qword ptr [rsp+18h],rsi
+fffff803`2c9d098a 57              push    rdi
+fffff803`2c9d098b 4883ec20        sub     rsp,20h
+fffff803`2c9d098f 488b4120        mov     rax,qword ptr [rcx+20h]
+fffff803`2c9d0993 488bf2          mov     rsi,rdx
+fffff803`2c9d0996 4883613800      and     qword ptr [rcx+38h],0
+fffff803`2c9d099b 488d542430      lea     rdx,[rsp+30h]
+fffff803`2c9d09a0 488bd9          mov     rbx,rcx
+fffff803`2c9d09a3 c644243000      mov     byte ptr [rsp+30h],0
+fffff803`2c9d09a8 e833f70400      call    nt!guard_dispatch_icall (fffff803`2ca200e0)</code></pre>
+</details></li>
+<li>function is missing the body either due to absent module, or a large
+body has been decompiled and trimmed.</li>
+</ul></li>
+<li><code>.retpoline</code> build is not parallelized. Only 2E+3
+<em>poi</em> sources have to be decoded.</li>
+<li>Initially, the tool’s objective was GUI rendering through SVG. With
+broad trees being prevalent, a point-and-click is deemed
+impractical.</li>
+</ul>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>   <span class="fu">PS</span> <span class="op">&gt;</span> <span class="va">$prefix</span> <span class="op">=</span> <span class="st">&quot;https://raw.githubusercontent.com/armaber/scripts/refs/heads/disasm/&quot;</span><span class="op">;</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>        <span class="st">&quot;functions.ps1&quot;</span><span class="op">,</span> <span class="st">&quot;UfSymbol.ps1&quot;</span> <span class="op">|</span> <span class="cf">foreach</span> <span class="op">{</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>            <span class="fu">Invoke-WebRequest</span> <span class="va">$prefix</span><span class="op">/</span>DisassembleImage<span class="op">/</span><span class="va">$PSItem</span> <span class="op">-</span>OutFile <span class="va">$PSItem</span><span class="op">;</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>        <span class="op">}</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>        <span class="fu">Get-Help</span> <span class="op">.</span>\UfSymbol<span class="op">.</span><span class="fu">ps1</span> <span class="op">-</span>Full<span class="op">;</span></span></code></pre></div>
+</body>
+</html>

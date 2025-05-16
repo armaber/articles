@@ -2,7 +2,7 @@ Disassemble Memory File
 ===
 
 *Memory.DMP can be used to determine call graphs, outside the scope of analysis tools like kd.exe.
- With a full disassembly, the context around a particular symbol is explored at convenience.*
+ With a full disassembly, the context around a particular symbol is conveniently explored.*
 
 ~~~
 uf nt!HalGetBusDataByOffset
@@ -15,7 +15,7 @@ uf nt!HalGetBusDataByOffset
                                                    uf nt!guard_dispatch_icall (N/A)
 ~~~
 
-[*UfSymbol.ps1*](https://github.com/armaber/scripts/tree/disasm/DisassembleImage/UfSymbol.ps1)
+[UfSymbol.ps1](https://github.com/armaber/scripts/tree/disasm/DisassembleImage/UfSymbol.ps1)
 renders the call graph based on a disassembly file. The file is generated once, reused
 at rendering stage. The disassembly is separated into individual function bodies.
 The root body contains the symbol requested by the user. A dependency graph contains
@@ -97,7 +97,7 @@ Notes
 
 * Decompilation-ready processing is useful in support cases where the *Memory.DMP*
   file cannot be provided. Implementation differences between OS versions are also
-  visible. 
+  visible.
     * A `.dmp` file contains the dependencies from all modules, can trip the
       decompiler with inappropriate function bodies. This shortcoming does not apply
       to user mode.
@@ -106,14 +106,70 @@ Notes
 * Hotpaths are moved to inflight *CSharp* assembly. Decompilation can be **8 times**
   faster.
 * Decompilation through *kd.exe* can be superseded by *dbgeng.dll* COM interfaces.
+  Direct access to `dbgeng.h` has the benefit of measuring the decompilation process
+  through a progress bar. Trimming of function bodies occurs ad hoc. Parallel *kd.exe*
+  execution binds trimming to disassembly completion.
+  * `IDebugControl::WaitForEvent` fails when clients are created by multiple threads.
+    <details><summary>error message:</summary>
+    
+    ```
+    Can't set dump file contexts
+    MachineInfo::SetContext failed - Thread: 000001A2CDA07900  Handle: 1  Id: 1 - Error == 0x8000FFFF
+    ```
+
+    </details>
+  * `IDebugControl::Execute` is serialized with a *critical section*.
+    <details><summary>disassembly:</summary>
+
+    ```
+    0:017> k
+    # Child-SP          RetAddr               Call Site
+    00 00000035`6ed8d300 00007ffa`976b15e0     dbgeng!DebugClient::ExecuteWide+0x23
+    01 00000035`6ed8d350 00007ffa`37eccdc5     dbgeng!DebugClient::Execute+0xf0
+
+    0:000> uf dbgeng!DebugClient::ExecuteWide
+
+    00000001`80101bca 488d0dafe97a00  lea     rcx,[dbgeng!g_EngineLock (00000001`808b0580)]
+    00000001`80101bd1 48ff15b0e65600  call    qword ptr [dbgeng!_imp_EnterCriticalSection (00000001`80670288)]
+
+    00000001`80101c06 e8990ffdff      call    dbgeng!PushOutCtl (00000001`800d2ba4)
+    00000001`80101c23 e8e8f2ffff      call    dbgeng!Execute (00000001`80100f10)
+    00000001`80101c2f e81807fdff      call    dbgeng!PopOutCtl (00000001`800d234c)
+    00000001`80101c45 e896c2fcff      call    dbgeng!FlushCallbacks (00000001`800cdee0)
+
+    00000001`80101c50 488d0d29e97a00  lea     rcx,[dbgeng!g_EngineLock (00000001`808b0580)]
+    00000001`80101c57 48ff1512e65600  call    qword ptr [dbgeng!_imp_LeaveCriticalSection (00000001`80670270)]
+    ```
+
+    </details>
+* Inbox `dbgeng.dll` *10.0.19041.3636* identifies fewer functions compared with 
+  latest *10.0.26100.2454* version.
 * *UfSymbol* is meant for USB migration. No internet connection is needed.
 * Where `(N/A)` appears in rendering:
   * indirection table has no corresponding target symbol - ie. register is used.
+    <details><summary>rax &#8592; qword ptr [rcx+20h]:</summary>
+
+    ```
+    uf nt!IoCsqRemoveIrp
+    fffff803`2c9d0980 48895c2410      mov     qword ptr [rsp+10h],rbx
+    fffff803`2c9d0985 4889742418      mov     qword ptr [rsp+18h],rsi
+    fffff803`2c9d098a 57              push    rdi
+    fffff803`2c9d098b 4883ec20        sub     rsp,20h
+    fffff803`2c9d098f 488b4120        mov     rax,qword ptr [rcx+20h]
+    fffff803`2c9d0993 488bf2          mov     rsi,rdx
+    fffff803`2c9d0996 4883613800      and     qword ptr [rcx+38h],0
+    fffff803`2c9d099b 488d542430      lea     rdx,[rsp+30h]
+    fffff803`2c9d09a0 488bd9          mov     rbx,rcx
+    fffff803`2c9d09a3 c644243000      mov     byte ptr [rsp+30h],0
+    fffff803`2c9d09a8 e833f70400      call    nt!guard_dispatch_icall (fffff803`2ca200e0)
+    ```
+
+    </details>
   * function is missing the body either due to absent module, or a large body
     has been decompiled and trimmed.
 * `.retpoline` build is not parallelized. Only 2E+3 *poi* sources have to be decoded.
-* Initially, the objective was GUI rendering through SVG. With broad trees being
-  prevalent, a point-and-click is deemed impractical.
+* Initially, the tool's objective was GUI rendering through SVG. With broad trees
+  being prevalent, a point-and-click is deemed impractical.
 
 ~~~powershell
    PS > $prefix = "https://raw.githubusercontent.com/armaber/scripts/refs/heads/disasm/";
