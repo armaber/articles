@@ -109,6 +109,9 @@ Notes
   Direct access to `dbgeng.h` has the benefit of measuring the decompilation process
   through a progress bar. Trimming of function bodies occurs ad hoc. Parallel *kd.exe*
   execution binds trimming to disassembly completion.
+  * Speed-up with *kd.exe* is memory file dependent. `IDebugControl::Execute` is not
+    interruptible, `IDebugOutputCallbacks::Output` must retrieve the entire text before
+    it is validated.
   * `IDebugControl::WaitForEvent` fails when clients are created by multiple threads.
     <details><summary>error message:</summary>
     
@@ -142,6 +145,8 @@ Notes
     ```
 
     </details>
+  * The compiler uses long strings to decorate *C++* methods. The *uf* command
+    fails by name, works by address.
 * Inbox `dbgeng.dll` *10.0.19041.3636* identifies fewer functions compared with 
   latest *10.0.26100.2454* version.
 * *UfSymbol* is meant for USB migration. No internet connection is needed.
