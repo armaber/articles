@@ -178,7 +178,7 @@ Notes
 
 ~~~powershell
    PS > $prefix = "https://raw.githubusercontent.com/armaber/scripts/refs/heads/disasm/";
-        "functions.ps1", "UfSymbol.ps1" | foreach {
+        "HotPath.cs", "functions.ps1", "UfSymbol.ps1" | foreach {
             Invoke-WebRequest $prefix/DisassembleImage/$PSItem -OutFile $PSItem;
         }
         Get-Help .\UfSymbol.ps1 -Full;
