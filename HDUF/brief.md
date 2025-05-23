@@ -15,8 +15,33 @@ uf nt!HalGetBusDataByOffset
                                                    uf nt!guard_dispatch_icall (N/A)
 ~~~
 
-[UfSymbol.ps1](https://github.com/armaber/scripts/tree/disasm/DisassembleImage/UfSymbol.ps1)
-renders the call graph based on a disassembly file. The file is generated once, reused
+Blueprint
+-
+
+*The tool must display the callers or callees for a given symbol. In overwhelming cases,
+the symbol is a function. The symbol can be a microinstruction, belonging to a function
+body, or it can be a global variable, in which case the containing bodies are identified,
+all dependencies are displayed.*
+
+*The tool must work offline. It can be migrated to an USB and used on-premise, where
+support cases do not allow internet connection.*
+
+*The tool must track a collection of memory files that are disassembled, for various
+OSs. A symbol is located in a precise index, specified in command line.*
+
+*The tool must reuse the disassembly file, when displaying the tree.*
+
+*The tool must generate the disassembly once. If the process takes a long time, the tool
+must show a warning. The tool must store metadata about disassembly to allow statistics
+to be collected.*
+
+*The tool must perform fast, even if confined to commodity systems.*
+
+*The tool can show collateral dependencies, like import functions or function pointers
+ used as arguments.*
+
+1. <u>[UfSymbol.ps1](https://github.com/armaber/scripts/tree/disasm/DisassembleImage/UfSymbol.ps1)
+renders the call graph based on a disassembly file.</u> The file is generated once, reused
 at rendering stage. The disassembly is separated into individual function bodies.
 The root body contains the symbol requested by the user. A dependency graph contains
 the callers or the callees for each function. CLI switches determine the depth of the
@@ -24,8 +49,8 @@ tree, target OS for rendering.
 
 * Generic functions have many callers; ie. 1118 matches for `nt!KeBugCheckEx` at `-Depth 1`.
 
-To keep the graph uncluttered, known functions are not disassembled: `KeYieldProcessorEx`
-calls other functions that are minute, `IofCompleteRequest`.
+2. <u>Known functions are not disassembled:</u> they can be minute like `KeYieldProcessorEx`,
+`ExAllocatePool2` or familiar as `IofCompleteRequest`, `atol`.
 
 [Sample](https://raw.githubusercontent.com/armaber/scripts/refs/heads/disasm/DisassembleImage/SampleOutput.txt)
 output renders the call tree for `nt!KiSystemStartup`.
@@ -41,21 +66,21 @@ D:\Processing\53c6f2af-38db-4219-9f41-f794c7897f5a\53c6f2af-38db-4219-9f41-f794c
 D:\Processing\53c6f2af-38db-4219-9f41-f794c7897f5a\53c6f2af-38db-4219-9f41-f794c7897f5a.retpoline
 ~~~
 
-The 1<sup>st</sup> line shows an estimate for the minimum disassembly duration: a smaller
-file was processed in 1.26 hours on the same system. The decompilation is executed on all
+3. <u>The disassembly stage can take a long time.</u> The 1<sup>st</sup> line shows a comparison with a
+previously decompiled *memory* file. The decompilation is executed on all
 cores but 1. Besides the `.disassembly` file, `.meta` and `.retpoline` are created.
 The `.meta` file contains:
 
-* *OS* and *computer* where the BSOD occurred
+* *OS* and *computer* where the BSOD occurred.
 * *image* path and *hash*. The hash identifies duplicates, resulting in a decompilation
   bypass.
-* *system* where disassembly took place, number of *cpus* alloted, cpu *model*, *duration* and
+* *system* where disassembly took place, *number* of CPUs alloted, CPU *model*, *duration* and
   image *size*.
 * The default modules used to disassemble the image:
    * for a `.dmp` file *nt, pci, acpi and hal* functions are disassembled
-   * *base name* for all others
+   * *base name* for all others.
 
-The `.retpoline` file is an indirection table for bodies compiled with `/guard:cf`.
+4. <u>The `.retpoline` file is an indirection table for bodies compiled with `/guard:cf`.</u>
 Wherever `call nt!guard_dispatch_icall` is found, the source pointer is resolved in
 the memory file and displayed.
 
@@ -63,7 +88,7 @@ For `nt!KiSystemStartup` call tree:
 
 * 1302 callees are identified with `-Depth 4`, 5318 at depth 6.
 * Complete decompilation and identification takes **5215** seconds on an "Intel(R)
-  Core(TM) i3-7100U CPU @ 2.40GHz" with 3 cpus.
+  Core(TM) i3-7100U CPU @ 2.40GHz" with 3 CPUs.
 
 ~~~
 uf nt!KdInitSystem
@@ -87,13 +112,36 @@ uf nt!guard_dispatch_icall (nt!_security_cookie
 5215.506918
 ~~~
 
-`-Setup` is a text based guide that configures the directory where disassemblies are
-stored. A symbol path can be specified, a lower limit can trigger a warning if other
-dissasemblies overlast it. Disassembly duration and system, cpu model, file size can
-be suppressed from future `.meta` files.
+5. <u>With `.\UfSymbol.ps1 -Setup`, a text based guide is launched.</u> Configuration
+options are set in `UfSymbol.json` file:
+
+* directory where disassemblies are stored - internally called `$Database`. 
+* symbol path
+* time limit for decompilation warning. Where `.meta` file previously generated
+  has a duration larger than the limit, then the file and duration are printed.
+* statistics deactivation like duration, system, CPU model, file size from future
+  `.meta` files.
+
+6. <u>`.\UfSymbol.ps1 -List OS | Complete` lists the `.meta` files in table form.</u>
+
+|computer|os \| basename &#8593;|image|
+|:--------|:---------------|:-----|
+| INHOUSE1 | dbgeng 10.0.26100.2454 | C:\\Program Files (x86)\\Windows Kits\\10\\Debuggers\\x64\\dbgeng.dll |
+| INHOUSE1 | Windows 11 Enterprise 22000 | D:\\DataLake\\2025-01-28\\MEMORY.DMP |
+| DEPLOY1 |  Windows 10 Enterprise LTSC 2019 17763 | C:\\Windows\\Memory.DMP |
+| DEPLOY2 | Windows 10 Pro 22631 | D:\\DataLake\\2025-04-28\\MEMORY.DMP |
+
+7. <u>UfSymbol.ps1 can be copied/migrated to an USB drive.</u> The local database is rendered
+in place.
+
+8. <u>`powershell Core` is required given the performance benefits in the interpreter engine.</u>
+Inbox `Desktop 5.1` has bottlenecks.
+
+9. <u>**Hotpaths** are moved to inflight *CSharp* assembly.</u> Decompilation is **8 times**
+faster.
 
 Notes
----
+-
 
 * Decompilation-ready processing is useful in support cases where the *Memory.DMP*
   file cannot be provided. Implementation differences between OS versions are also
@@ -102,13 +150,16 @@ Notes
       decompiler with inappropriate function bodies. This shortcoming does not apply
       to user mode.
     * An executable solves all functions, cannot solve dependencies.
-* PowerShell *Core* is required. *Desktop 5.1* is slow.
-* Hotpaths are moved to inflight *CSharp* assembly. Decompilation can be **8 times**
-  faster.
+* Initially, the tool's objective was GUI rendering through SVG. With broad trees
+  being prevalent, a point-and-click is deemed impractical.
+*  `Complete Memory Dump` contains more functions compared to `Kernel Memory`.
 * Decompilation through *kd.exe* can be superseded by *dbgeng.dll* COM interfaces.
-  Direct access to `dbgeng.h` has the benefit of measuring the decompilation process
-  through a progress bar. Trimming of function bodies occurs ad hoc. Parallel *kd.exe*
-  execution binds trimming to disassembly completion.
+  Direct access to `dbgeng.h` gives control to the process: trimming of
+  function bodies occurs ad hoc. Parallel *kd.exe* execution binds trimming to
+  disassembly completion.
+  * Speed-up with *kd.exe* is memory file dependent. `IDebugControl::Execute` is not
+    interruptible, `IDebugOutputCallbacks::Output` must retrieve the entire text before
+    it is validated.
   * `IDebugControl::WaitForEvent` fails when clients are created by multiple threads.
     <details><summary>error message:</summary>
     
@@ -142,9 +193,10 @@ Notes
     ```
 
     </details>
-* Inbox `dbgeng.dll` *10.0.19041.3636* identifies fewer functions compared with 
-  latest *10.0.26100.2454* version.
-* *UfSymbol* is meant for USB migration. No internet connection is needed.
+  * The compiler uses long strings to decorate *C++* methods. The *uf* command
+    uses the functions' address.
+* Inbox `dbgeng.dll` version *10.0.19041.3636* identifies fewer functions compared
+  with *10.0.26100.2454*.
 * Where `(N/A)` appears in rendering:
   * indirection table has no corresponding target symbol - ie. register is used.
     <details><summary>rax &#8592; qword ptr [rcx+20h]:</summary>
@@ -165,11 +217,9 @@ Notes
     ```
 
     </details>
-  * function is missing the body either due to absent module, or a large body
-    has been decompiled and trimmed.
+  * function body is missing either due to absent module, or a large body has
+    been decompiled and trimmed.
 * `.retpoline` build is not parallelized. Only 2E+3 *poi* sources have to be decoded.
-* Initially, the tool's objective was GUI rendering through SVG. With broad trees
-  being prevalent, a point-and-click is deemed impractical.
 
 ~~~powershell
    PS > $prefix = "https://raw.githubusercontent.com/armaber/scripts/refs/heads/disasm/";
