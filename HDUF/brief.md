@@ -19,17 +19,14 @@ Blueprint
 -
 
 *The tool must display the callers or callees for a given symbol. In overwhelming cases,
-the symbol is a function. The symbol can be a microinstruction, belonging to a function
-body, or it can be a global variable, in which case the containing bodies are identified,
-all dependencies are displayed.*
+the symbol is a function. The symbol can be a &#x03BC;instruction, belonging to a function
+body, or it can be a global variable. The containing bodies are identified, dependencies are displayed.*
 
-*The tool must work offline. It can be migrated to an USB and used on-premise, where
-support cases do not allow internet connection.*
+*The tool must work offline. It can be migrated to an USB and used on-premise without
+internet connection.*
 
-*The tool must track a collection of memory files that are disassembled, for various
-OSs. A symbol is located in a precise index, specified in command line.*
-
-*The tool must reuse the disassembly file, when displaying the tree.*
+*The tool must collect disassemblies representing memory files, for various OSs.
+A symbol is specified in command line, located by target name within the collection.*
 
 *The tool must generate the disassembly once. If the process takes a long time, the tool
 must show a warning. The tool must store metadata about disassembly to allow statistics
@@ -38,7 +35,7 @@ to be collected.*
 *The tool must perform fast, even if confined to commodity systems.*
 
 *The tool can show collateral dependencies, like import functions or function pointers
- used as arguments.*
+used as arguments.*
 
 1. <u>[UfSymbol.ps1](https://github.com/armaber/scripts/tree/disasm/DisassembleImage/UfSymbol.ps1)
 renders the call graph based on a disassembly file.</u> The file is generated once, reused
@@ -122,7 +119,7 @@ options are set in `UfSymbol.json` file:
 * statistics deactivation like duration, system, CPU model, file size from future
   `.meta` files.
 
-6. <u>`.\UfSymbol.ps1 -List OS | Complete` lists the `.meta` files in table form.</u>
+6. <u>`.\UfSymbol.ps1 -List OS | Complete` displays the `.meta` files in table form.</u>
 
 |computer|os \| basename &#8593;|image|
 |:--------|:---------------|:-----|
@@ -137,8 +134,13 @@ in place.
 8. <u>`powershell Core` is required given the performance benefits in the interpreter engine.</u>
 Inbox `Desktop 5.1` has bottlenecks.
 
-9. <u>**Hotpaths** are moved to inflight *CSharp* assembly.</u> Decompilation is **8 times**
-faster.
+9. <u>**Hotpaths** are moved to inflight *CSharp* assembly.</u> Decompilation is **8
+times** faster.
+
+10. <u>`.\UfSymbol.ps1 -Migrate` copies the internal files to a destination.</u> The 
+script can be launched from the destination.
+
+11. <u>`.\UfSymbol.ps1 -Self` updates the symbols list where rendering stops.</u>
 
 Notes
 -
@@ -223,7 +225,7 @@ Notes
 
 ~~~powershell
    PS > $prefix = "https://raw.githubusercontent.com/armaber/scripts/refs/heads/disasm/";
-        "functions.ps1", "UfSymbol.ps1" | foreach {
+        "HotPath.cs", "functions.ps1", "UfSymbol.ps1" | foreach {
             Invoke-WebRequest $prefix/DisassembleImage/$PSItem -OutFile $PSItem;
         }
         Get-Help .\UfSymbol.ps1 -Full;
