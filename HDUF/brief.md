@@ -25,8 +25,8 @@ body, or it can be a global variable. The containing bodies are identified, depe
 *The tool must work offline. It can be migrated to an USB and used on-premise without
 internet connection.*
 
-*The tool must collect disassemblies representing memory files, for various OSs.
-A symbol is specified in command line, located by target name within the collection.*
+*The tool must collect disassemblies representing memory files for various OSs. A symbol
+is specified in command line, located by target name within the collection.*
 
 *The tool must generate the disassembly once. If the process takes a long time, the tool
 must show a warning. The tool must store metadata about disassembly to allow statistics
@@ -37,7 +37,7 @@ to be collected.*
 *The tool can show collateral dependencies, like import functions or function pointers
 used as arguments.*
 
-1. <u>[UfSymbol.ps1](https://github.com/armaber/scripts/tree/disasm/DisassembleImage/UfSymbol.ps1)
+1. <u>[UfSymbol.ps1](https://github.com/armaber/scripts/tree/main/DisassembleImage/UfSymbol.ps1)
 renders the call graph based on a disassembly file.</u> The file is generated once, reused
 at rendering stage. The disassembly is separated into individual function bodies.
 The root body contains the symbol requested by the user. A dependency graph contains
@@ -49,7 +49,7 @@ tree, target OS for rendering.
 2. <u>Known functions are not disassembled:</u> they can be minute like `KeYieldProcessorEx`,
 `ExAllocatePool2` or familiar as `IofCompleteRequest`, `atol`.
 
-[Sample](https://raw.githubusercontent.com/armaber/scripts/refs/heads/disasm/DisassembleImage/SampleOutput.txt)
+[Sample](https://raw.githubusercontent.com/armaber/scripts/refs/heads/main/DisassembleImage/SampleOutput.txt)
 output renders the call tree for `nt!KiSystemStartup`.
 
 ~~~
@@ -121,12 +121,12 @@ options are set in `UfSymbol.json` file:
 
 6. <u>`.\UfSymbol.ps1 -List OS | Complete` displays the `.meta` files in table form.</u>
 
-|computer|os \| basename &#8593;|image|
-|:--------|:---------------|:-----|
-| INHOUSE1 | dbgeng 10.0.26100.2454 | C:\\Program Files (x86)\\Windows Kits\\10\\Debuggers\\x64\\dbgeng.dll |
-| INHOUSE1 | Windows 11 Enterprise 22000 | D:\\DataLake\\2025-01-28\\MEMORY.DMP |
-| DEPLOY1 |  Windows 10 Enterprise LTSC 2019 17763 | C:\\Windows\\Memory.DMP |
-| DEPLOY2 | Windows 10 Pro 22631 | D:\\DataLake\\2025-04-28\\MEMORY.DMP |
+|computer   |os \| basename &#8593;                    |image                                                                  |
+|:----------|:-----------------------------------------|:-----------------------------------------------------------------------|
+| INHOUSE1 | dbgeng 10.0.26100.2454                   | C:\\Program Files (x86)\\Windows Kits\\10\\Debuggers\\x64\\dbgeng.dll  |
+| INHOUSE1 | Windows 11 Enterprise 22000              | D:\\DataLake\\2025-01-28\\MEMORY.DMP                                   |
+| DEPLOY1  | Windows 10 Enterprise LTSC 2019 17763    | C:\\Windows\\Memory.DMP                                                |
+| DEPLOY2  | Windows 10 Pro 22631                     | D:\\DataLake\\2025-04-28\\MEMORY.DMP                                   |
 
 7. <u>UfSymbol.ps1 can be copied/migrated to an USB drive.</u> The local database is rendered
 in place.
@@ -182,16 +182,16 @@ Notes
 
     0:000> uf dbgeng!DebugClient::ExecuteWide
 
-    00000001`80101bca 488d0dafe97a00  lea     rcx,[dbgeng!g_EngineLock (00000001`808b0580)]
-    00000001`80101bd1 48ff15b0e65600  call    qword ptr [dbgeng!_imp_EnterCriticalSection (00000001`80670288)]
+    488d0dafe97a00  lea     rcx,[dbgeng!g_EngineLock (00000001`808b0580)]
+    48ff15b0e65600  call    qword ptr [dbgeng!_imp_EnterCriticalSection (00000001`80670288)]
 
-    00000001`80101c06 e8990ffdff      call    dbgeng!PushOutCtl (00000001`800d2ba4)
-    00000001`80101c23 e8e8f2ffff      call    dbgeng!Execute (00000001`80100f10)
-    00000001`80101c2f e81807fdff      call    dbgeng!PopOutCtl (00000001`800d234c)
-    00000001`80101c45 e896c2fcff      call    dbgeng!FlushCallbacks (00000001`800cdee0)
+    e8990ffdff      call    dbgeng!PushOutCtl (00000001`800d2ba4)
+    e8e8f2ffff      call    dbgeng!Execute (00000001`80100f10)
+    e81807fdff      call    dbgeng!PopOutCtl (00000001`800d234c)
+    e896c2fcff      call    dbgeng!FlushCallbacks (00000001`800cdee0)
 
-    00000001`80101c50 488d0d29e97a00  lea     rcx,[dbgeng!g_EngineLock (00000001`808b0580)]
-    00000001`80101c57 48ff1512e65600  call    qword ptr [dbgeng!_imp_LeaveCriticalSection (00000001`80670270)]
+    488d0d29e97a00  lea     rcx,[dbgeng!g_EngineLock (00000001`808b0580)]
+    48ff1512e65600  call    qword ptr [dbgeng!_imp_LeaveCriticalSection (00000001`80670270)]
     ```
 
     </details>
@@ -205,17 +205,17 @@ Notes
 
     ```
     uf nt!IoCsqRemoveIrp
-    fffff803`2c9d0980 48895c2410      mov     qword ptr [rsp+10h],rbx
-    fffff803`2c9d0985 4889742418      mov     qword ptr [rsp+18h],rsi
-    fffff803`2c9d098a 57              push    rdi
-    fffff803`2c9d098b 4883ec20        sub     rsp,20h
-    fffff803`2c9d098f 488b4120        mov     rax,qword ptr [rcx+20h]
-    fffff803`2c9d0993 488bf2          mov     rsi,rdx
-    fffff803`2c9d0996 4883613800      and     qword ptr [rcx+38h],0
-    fffff803`2c9d099b 488d542430      lea     rdx,[rsp+30h]
-    fffff803`2c9d09a0 488bd9          mov     rbx,rcx
-    fffff803`2c9d09a3 c644243000      mov     byte ptr [rsp+30h],0
-    fffff803`2c9d09a8 e833f70400      call    nt!guard_dispatch_icall (fffff803`2ca200e0)
+    48895c2410      mov     qword ptr [rsp+10h],rbx
+    4889742418      mov     qword ptr [rsp+18h],rsi
+    57              push    rdi
+    4883ec20        sub     rsp,20h
+    488b4120        mov     rax,qword ptr [rcx+20h]
+    488bf2          mov     rsi,rdx
+    4883613800      and     qword ptr [rcx+38h],0
+    488d542430      lea     rdx,[rsp+30h]
+    488bd9          mov     rbx,rcx
+    c644243000      mov     byte ptr [rsp+30h],0
+    e833f70400      call    nt!guard_dispatch_icall (fffff803`2ca200e0)
     ```
 
     </details>
@@ -224,7 +224,7 @@ Notes
 * `.retpoline` build is not parallelized. Only 2E+3 *poi* sources have to be decoded.
 
 ~~~powershell
-   PS > $prefix = "https://raw.githubusercontent.com/armaber/scripts/refs/heads/disasm/";
+   PS > $prefix = "https://raw.githubusercontent.com/armaber/scripts/refs/heads/main/";
         "HotPath.cs", "functions.ps1", "UfSymbol.ps1" | foreach {
             Invoke-WebRequest $prefix/DisassembleImage/$PSItem -OutFile $PSItem;
         }

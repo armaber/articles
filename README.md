@@ -16,6 +16,5 @@ constant on Windows, applications adjust it at will.
   SMBUS wire protocol.
 - [PCITree](./PCITree/brief.md): mentions on PCIe scripted enumeration on Windows.
 - [NativeHotPlug](./PCIeHP/notes.md): Windows and ACPI support for PCIe hot plug.
-
-Upcoming:
-- *[HeavyDutyUF](./HDUF/brief.md)*: disassemble the kernel to build a call tree for a chosen symbol.
+- [HeavyDutyUF](./HDUF/brief.md): disassemble the kernel to build a call tree for a
+chosen symbol.
