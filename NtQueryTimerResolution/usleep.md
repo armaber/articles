@@ -418,7 +418,7 @@ takes **94** minutes, so use an **XPath** query instead.
 
 Start by displaying the event layout:
 
-    PS C:\> $xml = (Get-WinEvent $PathToEtl -Oldest | Select -First 1).ToXml();
+    PS C:\> $xml = (Get-WinEvent -Path $PathToEtl -Oldest | Select -First 1).ToXml();
     PS C:\> function prettify {
         param([string]$x)
 
