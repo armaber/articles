@@ -1,5 +1,5 @@
 System Management Bus Access through ACPI Methods on Windows
----
+===
 
 Introduction
 -
@@ -8,7 +8,8 @@ In user mode, there are no built-in APIs to issue SMBUS commands. Both Intel
 and AMD packages implement a dedicated function, part of the chipset,
 which can drive the electrical protocol.
 
-The function is placed at a fixed BDF: newer Intel uses 0:1F.4, AMD uses 0:14.0.
+The function is placed at a fixed BDF. Intel implements the SMBUS device at
+0:1F.4, AMD uses 0:14.0.
 
 The SMBUS registers such as *address, command, status, protocol type, start, stop*
 are represented in IO port space. Intel does **not document** the wait-state
@@ -71,8 +72,7 @@ Method evaluation is not part of the source code.
 During OS uptime, the device objects call into the driver stack. For example,
 Iris gfx issues *\_DOD* method to determine devices attached to it. Every method
 invocation by an FDO implementing an embedded controller is
-[solved](https://learn.microsoft.com/en-us/windows-hardware/drivers/acpi/device-stacks-for-an-acpi-device) by the ACPI driver underneath: audio, ethernet,
-wifi, storage controller, display, bluetooth.
+[solved](https://learn.microsoft.com/en-us/windows-hardware/drivers/acpi/device-stacks-for-an-acpi-device) by the ACPI driver underneath: audio, ethernet, wifi, storage controller, display, bluetooth.
 
 > If an ACPI device is a hardware device integrated into the system board,
 > the system creates a device stack with a bus filter device object (filter DO)
@@ -192,9 +192,9 @@ if (NT_SUCCESS(status)) {
 return status;
 ```
 
-The SMBUS has several wire protocols: quick command, send/receive byte, write/read
-byte/word, write/read block. Accessing the byte transfer method requires *prior
-knowledge* about the return value.
+The SMBUS has several wire protocols: *quick command, send/receive byte, write/read
+byte/word, write/read block*. Accessing the byte transfer method requires prior
+knowledge about the return value.
 
 With *!amli*, the body is decompiled:
 ```
@@ -221,7 +221,7 @@ Return(0xffff)
 ```
 The read-byte protocol returns 0xFFFF in case of failure, or a byte value.
 The input parameters and the return value are handled:
-```
+```c
 acpi = context->Acpi;
 acpi->ArgumentCount = 2;
 size = FIELD_OFFSET(ACPI_EVAL_INPUT_BUFFER_COMPLEX_EX, Argument)+
@@ -395,7 +395,7 @@ if (context->Cpuinfo.Vendor == VENDOR_INTEL) {
     }
 }
 ```
-Note: for each EVAL ioctl, the OS creates a watchdog timer that expires in 30
+**Note:** for each EVAL ioctl, the OS creates a watchdog timer that expires in 30
 seconds; it *does overreact*.
 
 Synchronization
@@ -448,11 +448,56 @@ full control. For comparison, *Linux kernel* and *ReactOS* acquire an interprete
 lock with each method invocation. The lock is released and acquired when calling
 *Sleep*. *Stall* does not relinquish the thread.
 
+*ACPIoctlEvalControlMethod* ends in *AsyncEvalObject* which acquires a *DISPATCH_LEVEL*
+spin lock. Within the protected code, the OpRegion is processed.
+
+```
+nt!HaliPciInterfaceReadConfig
+ACPI!AcpiWrapperReadConfig
+pci!PciBusInterface_GetBusData
+ACPI!PciConfigSpaceHandlerWorker
+ACPI!PciConfigSpaceHandler
+ACPI!InternalOpRegionHandler
+ACPI!AccessBaseField
+ACPI!AccessFieldData
+ACPI!ReadFieldObj
+ACPI!RunContext
+ACPI!InsertReadyQueue
+
+lea     rcx,[ACPI!gReadyQueue+0x18 (fffff801`3d4a1d18)]
+call    qword ptr [ACPI!_imp_KeAcquireSpinLockRaiseToDpc (fffff801`3d4ab700)]
+
+xor     edx,edx
+mov     rcx,r15
+call    ACPI!InsertReadyQueue (fffff801`3d42e2c0)
+
+lea     rcx,[ACPI!gReadyQueue+0x18 (fffff801`3d4a1d18)]
+call    qword ptr [ACPI!_imp_KeReleaseSpinLock (fffff801`3d4ab6f8)]
+
+
+ACPI!AsyncEvalObject
+ACPI!SyncEvalObject
+ACPI!AMLIEvalNameSpaceObject
+ACPI!ACPIIoctlEvalControlMethod
+ACPI!ACPIIrpDispatchDeviceControl
+ACPI!ACPIDispatchIrp
+nt!IopfCallDriver
+nt!IovCallDriver
+nt!IofCallDriver
+Wdf01000!FxIoTarget::Send
+Wdf01000!FxIoTarget::SubmitSync
+Wdf01000!FxIoTargetSendIoctl
+Wdf01000!imp_WdfIoTargetSendIoctlSynchronously
+USBXHCI!Controller_ExecuteDSM
+USBXHCI!Controller_ExecuteHSICDisconnectInU3Workaround
+USBXHCI!Controller_WdfEvtDeviceD0Exit
+```
+
 Data Gathering
 -
 The ACPI bitmap is preserved in *Memory.DMP* generated with a BSOD. The files
 can be processed with *KD.exe* using JavaScript:
-```
+```javascript
 "use strict";
 
 function toString(s)
@@ -512,15 +557,41 @@ printed using *!pcitree*.
 Of 11 Intel systems, 7 Xeon and 4 Core, only 2 Core SKUs implement the full
 range of SMBUS transfer types as ACPI methods.
 
+Planning Ahead
+-
+
+Many Intel processor families no longer supply SMBUS methods in their firmware.
+Is there a way to provision an application ahead of deployment?
+
+The [slimbootloader](https://slimbootloader.github.io/introduction/index.html) contains ACPI tables
+starting from 2016 with *Apollo Lake* processor family up to current *Arrow Lake*. 
+
+A query on the repository reveals only *_DSM* methods for the SBUS device.
+
+```powershell
+PS slimbootloader> Get-ChildItem -Recurse -Filter *.asl | Select-String "Name(_ADR,0x001F0004)" -SimpleMatch -Context 1,2
+
+  Platform\AlderlakeBoardPkg\AcpiTables\Dsdt\Pch.asl:311:  Device(SBUS) {
+> Platform\AlderlakeBoardPkg\AcpiTables\Dsdt\Pch.asl:312:    Name(_ADR,0x001F0004)
+  Platform\AlderlakeBoardPkg\AcpiTables\Dsdt\Pch.asl:313:    Method(_DSM,4,serialized){if(PCIC(Arg0)) {
+                                                               return(PCID(Arg0,Arg1,Arg2,Arg3)) };
+                                                               Return(Buffer() {0})
+                                                             }
+  Platform\AlderlakeBoardPkg\AcpiTables\Dsdt\Pch.asl:314:  }
+...
+```
+
 Conclusion
 -
-* Typical consumers of ACPI are ECs whose FDOs lie on top of ACPI filter.
+* Typical consumers of ACPI are embedded controllers whose FDOs lie on top of ACPI
+  filter.
 * Remote clients can invoke SMBUS ACPI methods after opening a root object name
   and computing the absolute path. The method is decompiled, input arguments and
   return value are part of *IOCTL\_ACPI\_EVAL\_METHOD\_EX*.
 * SMBUS can be accessed either with ACPI methods or with IO ports. IO ports
   implementation can gather a baseline from different platforms and specify
   the largest wait-state. The host controller supports up to 100 kHz clock speed.
-  An algorithm can be easily approached through electrical engineering.
 * Applications cannot access directly the root object.
   *IRP\_MJ\_DEVICE\_CONTROL* is handled differently than *IRP\_MJ\_INTERNAL\_DEVICE\_CONTROL*.
+* Repositories such as *slimbootloader* that have vendor engangement can show
+  which ACPI methods are available, if any.
