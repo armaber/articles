@@ -398,101 +398,6 @@ if (context->Cpuinfo.Vendor == VENDOR_INTEL) {
 **Note:** for each EVAL ioctl, the OS creates a watchdog timer that expires in 30
 seconds; it *does overreact*.
 
-Synchronization
--
-
-The *STRT* method polls bit 6 on *HSTS* as long as there is a consumer, using 
-a *Sleep(1ms)*. The specification
-[states](https://uefi.org/specs/ACPI/6.5/05_ACPI_Software_Programming_Model.html#control-method-execution):
-
-> Interpretation of a Control Method is not preemptive, but it can block. When
-> a control method does block, OSPM can initiate or continue the execution of
-> a different control method. A control method can only assume that access to
-> global objects is exclusive for any period the control method does not block.
-
-The operating regions are exclusive by [design](https://uefi.org/specs/ACPI/6.5/05_ACPI_Software_Programming_Model.html#access-to-operation-regions).
-
-  > Control methods must have exclusive access to any address accessed via fields
-  > declared in Operation Regions.
-
-```
-| OpRegion(SMBI:RegionSpace=SystemIO,Offset=0xf040,Len=16)
-| Field(:Base=SMBI,BaseObjData=ffffd1099d507078)
-| * Base =>OpRegion(:RegionSpace=SystemIO,Offset=0xf040,Len=16)
-| FieldUnit(HSTS:FieldParent=ffffd1099d5070e8,ByteOffset=0x0,
-            StartBit=0x0,NumBits=8,FieldFlags=0x1)
-| FieldUnit(:FieldParent=ffffd1099d5070e8,ByteOffset=0x1,
-            StartBit=0x0,NumBits=8,FieldFlags=0x1)
-| FieldUnit(HCON:FieldParent=ffffd1099d5070e8,ByteOffset=0x2,
-            StartBit=0x0,NumBits=8,FieldFlags=0x1)
-| FieldUnit(HCOM:FieldParent=ffffd1099d5070e8,ByteOffset=0x3,
-            StartBit=0x0,NumBits=8,FieldFlags=0x1)
-| FieldUnit(TXSA:FieldParent=ffffd1099d5070e8,ByteOffset=0x4,
-            StartBit=0x0,NumBits=8,FieldFlags=0x1)
-| FieldUnit(DAT0:FieldParent=ffffd1099d5070e8,ByteOffset=0x5,
-            StartBit=0x0,NumBits=8,FieldFlags=0x1)
-| FieldUnit(DAT1:FieldParent=ffffd1099d5070e8,ByteOffset=0x6,
-            StartBit=0x0,NumBits=8,FieldFlags=0x1)
-| FieldUnit(HBDR:FieldParent=ffffd1099d5070e8,ByteOffset=0x7,
-            StartBit=0x0,NumBits=8,FieldFlags=0x1)
-| FieldUnit(PECR:FieldParent=ffffd1099d5070e8,ByteOffset=0x8,
-            StartBit=0x0,NumBits=8,FieldFlags=0x1)
-| FieldUnit(RXSA:FieldParent=ffffd1099d5070e8,ByteOffset=0x9,
-            StartBit=0x0,NumBits=8,FieldFlags=0x1)
-| FieldUnit(SDAT:FieldParent=ffffd1099d5070e8,ByteOffset=0xa,
-            StartBit=0x0,NumBits=16,FieldFlags=0x1)
-```
-
-As long as there are no errors and no contention, the method is executed with
-full control. For comparison, *Linux kernel* and *ReactOS* acquire an interpreter
-lock with each method invocation. The lock is released and acquired when calling
-*Sleep*. *Stall* does not relinquish the thread.
-
-*ACPIoctlEvalControlMethod* ends in *AsyncEvalObject* which acquires a *DISPATCH_LEVEL*
-spin lock. Within the protected code, the OpRegion is processed.
-
-```
-nt!HaliPciInterfaceReadConfig
-ACPI!AcpiWrapperReadConfig
-pci!PciBusInterface_GetBusData
-ACPI!PciConfigSpaceHandlerWorker
-ACPI!PciConfigSpaceHandler
-ACPI!InternalOpRegionHandler
-ACPI!AccessBaseField
-ACPI!AccessFieldData
-ACPI!ReadFieldObj
-ACPI!RunContext
-ACPI!InsertReadyQueue
-
-lea     rcx,[ACPI!gReadyQueue+0x18 (fffff801`3d4a1d18)]
-call    qword ptr [ACPI!_imp_KeAcquireSpinLockRaiseToDpc (fffff801`3d4ab700)]
-
-xor     edx,edx
-mov     rcx,r15
-call    ACPI!InsertReadyQueue (fffff801`3d42e2c0)
-
-lea     rcx,[ACPI!gReadyQueue+0x18 (fffff801`3d4a1d18)]
-call    qword ptr [ACPI!_imp_KeReleaseSpinLock (fffff801`3d4ab6f8)]
-
-
-ACPI!AsyncEvalObject
-ACPI!SyncEvalObject
-ACPI!AMLIEvalNameSpaceObject
-ACPI!ACPIIoctlEvalControlMethod
-ACPI!ACPIIrpDispatchDeviceControl
-ACPI!ACPIDispatchIrp
-nt!IopfCallDriver
-nt!IovCallDriver
-nt!IofCallDriver
-Wdf01000!FxIoTarget::Send
-Wdf01000!FxIoTarget::SubmitSync
-Wdf01000!FxIoTargetSendIoctl
-Wdf01000!imp_WdfIoTargetSendIoctlSynchronously
-USBXHCI!Controller_ExecuteDSM
-USBXHCI!Controller_ExecuteHSICDisconnectInU3Workaround
-USBXHCI!Controller_WdfEvtDeviceD0Exit
-```
-
 Data Gathering
 -
 The ACPI bitmap is preserved in *Memory.DMP* generated with a BSOD. The files
@@ -505,7 +410,7 @@ function toString(s)
     if (typeof s == "string") {
         return s;
     }
-    var m = ""
+    var m = "";
     for (var i of s) {
         m += i + "\n";
     }
