@@ -169,7 +169,7 @@ To invoke an ACPI method in the *root* object, an *absolute name* is needed.
 The SMBUS controller is located at *&lt;Node1&gt;.&lt;Node2&gt;.**SBUS***,
 where Node1 is always *\\\_SB* and Node2 is *PCI0* in many cases. With
 *IOCTL_ACPI_ENUM_CHILDREN*, the name is retrieved:
-```
+```c
 acpi = (PACPI_ENUM_CHILDREN_INPUT_BUFFER)context->Acpi;
 RtlZeroMemory(acpi, context->Inlen);
 acpi->Signature = ACPI_ENUM_CHILDREN_INPUT_BUFFER_SIGNATURE;
@@ -312,7 +312,7 @@ Return(Zero)
 In case of a persistent failure, *Stall(0x32 &#x00B5;s)* is called 4000 times.
 
 The response *Type* determines if the method completed or failed:
-```
+```c
 cookie = response->Argument[0].Argument;
 if (response->Argument[0].Type == ACPI_METHOD_ARGUMENT_INTEGER && !cookie) {
     status = STATUS_DEVICE_DATA_ERROR;
@@ -329,7 +329,7 @@ of *IOCTL\_ACPI\_EVAL\_METHOD\_EX*. At runtime, the wrappers are tested using a
 passive device like *SMBUS\_SMART\_BATTERY\_ADDRESS*. The device responds to
 read-word protocol or returns a value out of range. Both cases indicate that the
 method is present and a proper slave device can be adressed.
-```
+```c
 const SMBUS_FUNCTION SmbusIntelFunction[] = {
     {
         { 6, 58 },
@@ -468,7 +468,7 @@ Planning Ahead
 Many Intel processor families no longer supply SMBUS methods in their firmware.
 Is there a way to provision an application ahead of deployment?
 
-The [slimbootloader](https://slimbootloader.github.io/introduction/index.html) contains ACPI tables
+The [slimbootloader](https://slimbootloader.github.io/introduction/index.html) project contains ACPI tables
 starting from 2016 with *Apollo Lake* processor family up to current *Arrow Lake*. 
 
 A query on the repository reveals only *_DSM* methods for the SBUS device.
@@ -483,7 +483,6 @@ PS slimbootloader> Get-ChildItem -Recurse -Filter *.asl | Select-String "Name(_A
                                                                Return(Buffer() {0})
                                                              }
   Platform\AlderlakeBoardPkg\AcpiTables\Dsdt\Pch.asl:314:  }
-...
 ```
 
 Conclusion
