@@ -13,29 +13,35 @@ if (m_ObjectState != FxObjectStateCreated) {
 }
 ```
 
-Part of the KMDF architecture is the object hierarchy tenet. Each object has a parent.
-The object is deleted on demand with `WdfObjectDelete` or implicitly when the parent is
-deleted. For `WdfRegistryOpenKey(WDF_NO_OBJECT_ATTRIBUTES)`, the default parent is the
-`Driver` object.
+From "Architecture of the Kernel-Mode Driver Framework" whitepaper:
+
+> KMDF provides a well-defined object model and controls the lifetime of
+  objects and memory allocations. Objects are organized hierarchically in
+  a parent/child model, and important driver data structures are maintained
+  by KMDF instead of by the driver.
+
+
+An object is deleted on demand with `WdfObjectDelete` or implicitly when the
+parent is deleted. For `WdfRegistryOpenKey(WDF_NO_OBJECT_ATTRIBUTES)`, the default
+parent is the `Driver` object.
 
 *We've learnt that no objects can be created in the parent's lifetime demotion.*
 
-One way to reveal the root cause is through **IFR** = In-Flight Recorder mechanism.
-
-*This guide is an IFR overview, with its valuable traces and convoluted setup.*
+**IFR** = In-Flight Recorder mechanism reveals the root cause. *Given its valuable
+traces and convoluted setup, use this guide as an overview.*
 
 IFR Setup
 -
 
-IFR is a logging mechanism, developed as a [**WPP** = Windows Software Trace Preprocessor](https://learn.microsoft.com/en-us/windows-hardware/drivers/devtest/wpp-software-tracing) provider.
-IFR is embedded in **Wdf01000.sys**', or it can be developed within a driver.
+IFR is a logging mechanism, implemented as a [**WPP** = Windows Software Trace Preprocessor](https://learn.microsoft.com/en-us/windows-hardware/drivers/devtest/wpp-software-tracing) provider. IFR is embedded
+in **Wdf01000.sys**, or can be part of a driver.
 
 To use IFR, provider flags must be turned on and a trace session must be launched.
 
 On the KMDF plane, `WdfVerifier.exe` turns on or off settings for particular drivers / DOs.
 Launch it on the target system, use the following settings within the **Drivers** tab:
 
-- navigate to *<IHV_Driver>*, expand
+- navigate to *&lt;IHV_Driver&gt;*, expand
 - *right-click* on **VerifierOn is always OFF**
 - *right-click* on **VerboseOn OFF**
 - *right-click* on **Track handles is not active**, select **Track all handle references**
@@ -230,10 +236,8 @@ $SymbolServer = "srv*$LocalSym*https://msdl.microsoft.com/download/symbols";
 & $SymChkExe C:\Windows\System32\drivers\wdf01000.sys /su $SymbolServer;
 ```
 
-`symchk` downloads the `.pdb` file using a *refresh* `/su` switch.
-
-**Note:** There are many versions of *wdf01000.sys*. The local `C:\Symbols` directory
-keeps track of each *.pdb* in separate subdirectories.
+`symchk` downloads the `.pdb` file using a *refresh* `/su` switch. There are many *wdf01000.sys*
+versions. The local `C:\Symbols` directory keeps track of each *.pdb* in separate subdirectories.
 
 ```powershell
 $TraceFmtExe = "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\tracefmt.exe";
@@ -476,18 +480,19 @@ During the *WDFKEY* creation, the state of the driver is compared and the framew
 Notes
 -
 
-* WDF prevents objects from being created in the cleanup path.
-* KMDF generates the IFR events using a preparation stage:
+* IFR events are activated using `WdfVerifier.exe` and `tracelog.exe`:
     * `WdfVerifier.exe` turns on the driver flags on the target system.
-    * The trace session is launched and stopped, the resulting file is explored.
-    * It is possible to view the traces in the console, using a realtime session.
-* The binary file is decoded using the `Wdf01000.sys` image and adjacent `.pdb`.
+    * The `.pdb` file for the image containing the events must be procured.
+    * The trace session is launched and stopped; the resulting file is explored.
+    * Or a realtime session can be launched, with events decoded and displayed
+      in the console.
+* To decode the binary log, use the `Wdf01000.sys` image and adjacent `.pdb`.
 
     ```powershell
     & $SymChkExe C:\Windows\System32\drivers\wdf01000.sys /su $SymbolServer;
     ```
     * `tracepdb` version *10.0.26100.4188* is unusable.
-
+    
 * To postprocess the `.etl`:
 
     ```powershell
@@ -496,7 +501,7 @@ Notes
 
     & $TraceFmtExe $TraceFile -i C:\Windows\System32\drivers\wdf01000.sys -r $LocalSym;
     ```
-
+    
 * To log the events as they appear:
 
     ```powershell
@@ -504,5 +509,6 @@ Notes
 
     & $TraceFmtExe -rt kmdfsession -i C:\Windows\System32\drivers\wdf01000.sys -r $LocalSym -displayonly;
     ```
+
 * `tracefmt` generates a `Wdf01000.mof` file containing the human-readable
    flags and levels. Those can be fed into `-guid <file>.ctl`.
