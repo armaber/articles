@@ -28,7 +28,7 @@ parent is the `Driver` object.
 *We've learnt that no objects can be created in the parent's lifetime demotion.*
 
 **IFR** = In-Flight Recorder mechanism reveals the root cause. *Given its valuable
-traces and convoluted setup, use this guide as an overview.*
+traces and intricate setup, a minimal overview is provided with this guide.*
 
 IFR Setup
 -
@@ -36,7 +36,7 @@ IFR Setup
 IFR is a logging mechanism, implemented as a [**WPP** = Windows Software Trace Preprocessor](https://learn.microsoft.com/en-us/windows-hardware/drivers/devtest/wpp-software-tracing) provider. IFR is embedded
 in **Wdf01000.sys**, or can be part of a driver.
 
-To use IFR, provider flags must be turned on and a trace session must be launched.
+To use IFR, provider flags must be enabled and a trace session must be launched.
 
 On the KMDF plane, `WdfVerifier.exe` turns on or off settings for particular drivers / DOs.
 Launch it on the target system, use the following settings within the **Drivers** tab:
