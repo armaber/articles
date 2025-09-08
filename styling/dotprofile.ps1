@@ -10,7 +10,8 @@ function StyleTo-Html
     sequences, use Courier font, table CSS formatting.
 #>
     param(
-        [string]$Path = (Get-Item *.md -EA SilentlyContinue | Select-Object -First 1).FullName
+        [string]$Path = (Get-Item *.md -EA SilentlyContinue | Select-Object -First 1).FullName,
+        [string]$Target = "html"
     )
 
     if (-not $Path -or -not (Test-Path $Path -PathType Leaf)) {
@@ -22,9 +23,22 @@ function StyleTo-Html
 
     $bn = $i.FullName;
     $cd = $i.DirectoryName;
-    $to = $cd + "\" + $i.BaseName + ".html";
+    $to = $cd + "\" + $i.BaseName + ".$Target";
 
-    & ${env:LOCALAPPDATA}\Pandoc\pandoc.exe -f markdown -t html $bn > $to;
+    if ($Target -eq "html") {
+        & ${env:ProgramFiles}\Pandoc\pandoc.exe -f markdown -t $Target $bn > $to;
+    } elseif ($Target -eq "pdf") {
+        Push-Location $cd
+        $from = "./" + $i.Name;
+        $to = "./" + $i.BaseName + ".$Target";
+        & wsl -- pandoc -H ~/head.tex -f markdown -t $Target --pdf-engine=xelatex $from -o $to -V geometry:a4paper,margin=20mm -V colorlinks;
+        Pop-Location;
+    } else {
+        & ${env:LOCALAPPDATA}\Pandoc\pandoc.exe -f markdown -t $Target $bn -o $to;
+    }
+    if ($Target -ne "html") {
+        return;
+    }
     $ct = @'
 <html lang="en-us">
 <title></title>
@@ -41,9 +55,11 @@ function StyleTo-Html
     }
     code {
         font-family: 'Courier New', Courier, monospace;
+        font-size: large;
     }
     body {
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-size: x-large;
     }
     table {
         border-spacing: 0;
