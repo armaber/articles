@@ -67,9 +67,53 @@ $TraceLogExe = "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\trac
 `C:\KmdfSession.etl`. **Keywords** represent a bitmask encoded in
 `src\framework\shared\inc\private\common\fxtrace.h`.
 **Level** is specified in `src\framework\shared\inc\private\common\dbgtrace.h`.
-The values are visible in *Wdf01000.mof*.
 
-<details><summary>keywords=trace flags + level</summary>
+For a provider lacking the source code, the values are visible with 
+`logman.exe query providers "<ProviderName>"`:
+
+```text
+PS > logman.exe query providers "KMDFv1 Trace Provider"
+Provider                                 GUID
+--------------------------------------------------------------------------------
+KMDFv1 Trace Provider                     {544D4C9D-942C-46D5-BF50-DF5CD9524A50}
+
+Value               Keyword               Description
+--------------------------------------------------------------------------------
+0x0000000000000001  TRACINGFULL           TRACINGFULL Flag
+0x0000000000000002  TRACINGERROR          TRACINGERROR Flag
+0x0000000000000004  TRACINGDBGPRINT       TRACINGDBGPRINT Flag
+0x0000000000000008  TRACINGFRAMEWORKS     TRACINGFRAMEWORKS Flag
+0x0000000000000010  TRACINGAPI            TRACINGAPI Flag
+0x0000000000000020  TRACINGAPIERROR       TRACINGAPIERROR Flag
+0x0000000000000040  TRACINGRESOURCES      TRACINGRESOURCES Flag
+0x0000000000000080  TRACINGLOCKING        TRACINGLOCKING Flag
+0x0000000000000100  TRACINGCONTEXT        TRACINGCONTEXT Flag
+0x0000000000000200  TRACINGPOOL           TRACINGPOOL Flag
+0x0000000000000400  TRACINGHANDLE         TRACINGHANDLE Flag
+0x0000000000000800  TRACINGPNP            TRACINGPNP Flag
+0x0000000000001000  TRACINGIO             TRACINGIO Flag
+0x0000000000002000  TRACINGIOTARGET       TRACINGIOTARGET Flag
+0x0000000000004000  TRACINGDMA            TRACINGDMA Flag
+0x0000000000008000  TRACINGREQUEST        TRACINGREQUEST Flag
+0x0000000000010000  TRACINGDRIVER         TRACINGDRIVER Flag
+0x0000000000020000  TRACINGDEVICE         TRACINGDEVICE Flag
+0x0000000000040000  TRACINGUSEROBJECT     TRACINGUSEROBJECT Flag
+0x0000000000080000  TRACINGOBJECT         TRACINGOBJECT Flag
+0x0000000000100000  TRACINGPNPPOWERSTATES TRACINGPNPPOWERSTATES Flag
+
+Value               Level                Description
+--------------------------------------------------------------------------------
+0x01                Fatal                Abnormal exit or termination
+0x02                Error                Severe errors that need logging
+0x03                Warning              Warnings such as allocation failure
+0x04                Information          Includes non-error cases
+0x05                Verbose              Detailed traces from intermediate steps
+```
+
+The trace values can also be obtained with a double pass on `tracefmt`, where the 1<sup>st</sup>
+pass generates a residual `.mof` file and the 2<sup>nd</sup> pass relaunches the session:
+
+<details><summary>.mof file: trace flags, level</summary>
 
 ```
 //ModuleName = Wdf01000KmdfTraceGuid     (Init called in Function FxTraceInitialize)
