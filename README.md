@@ -18,6 +18,9 @@ constant on Windows, applications adjust it at will.
 - [NativeHotPlug](./PCIeHP/notes.md): Windows and ACPI support for PCIe hot plug.
 - [HeavyDutyUF](./HDUF/brief.md): disassemble the kernel to build a call tree for a
 chosen symbol.
+- [IoDecode](./IoDecode/brief.md): decode CTL_CODE values from command line.
+- [PciFilter](https://github.com/armaber/drivers/tree/main/PciFilter#readme): observe system
+calls below FDOs on PCI eXpress.
 
 Preparation:
 - [IFR](./KmdfLogging/notes.md): enable KMDF logs for analysis.
