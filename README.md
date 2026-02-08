@@ -21,6 +21,8 @@ chosen symbol.
 - [IoDecode](./IoDecode/brief.md): decode CTL_CODE values from command line.
 - [PciFilter](https://github.com/armaber/drivers/tree/main/PciFilter#readme): observe system
 calls below FDOs on PCI eXpress.
+- [KsCategory](./KsCategory/cancelled.md): how come CreateFile(KSCATEGORY_VIDEO_CAMERA)
+fails with STATUS_CANCELLED?
 
 Preparation:
 - [IFR](./KmdfLogging/notes.md): enable KMDF logs for analysis.
