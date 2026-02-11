@@ -17,8 +17,10 @@ while (true) {
 }
 ```
 
-With spare time available, a target machine was set up. The problem replicates both
-on *Windows 10* and *11*, as initially reported.
+The problem replicates on *Windows 10* and *11* targets, as initially reported.
+
+`usbvideo.sys` has its private symbols stripped. It is not possible to decode the WPP logs.
+*Microsoft-Windows-USBVideo* provider yields no results.
 
 Let's look at CreateFile/CloseHandle call graph in kernel mode. First, **IRP_MJ_CLOSE**:
 
@@ -47,26 +49,26 @@ usbvideo!USBVideoFilterClose [35]
                                                     ⟜usbvideo!_imp_KeReleaseSpinLock
 ```
 
-`USBVideoFilterClose` calls *PowerDownDevice* which schedules a *WorkItem*:
+`USBVideoFilterClose` calls *PowerDownDevice* which schedules a *work item*:
 
 ```
 & .\UfSymbol.ps1 -Image $ImageFile -Display usbvideo!PowerDownDevice
 
 usbvideo!PowerDownDevice+0xbe:
-488b4918        mov     rcx,qword ptr [rcx+18h]
-48ff15f7aa0300  call    qword ptr [usbvideo!_imp_IoAllocateWorkItem (00000001`c00442a8)]
-0f1f440000      nop     dword ptr [rax+rax]
-488d1533feffff  lea     rdx,[usbvideo!IdleDetectWorkItem (00000001`c00095f0)]
-4885c0          test    rax,rax
-742b            je      usbvideo!PowerDownDevice+0x105 (00000001`c00097ed)
+mov     rcx,qword ptr [rcx+18h]
+call    qword ptr [usbvideo!_imp_IoAllocateWorkItem (00000001`c00442a8)]
+nop     dword ptr [rax+rax]
+lea     rdx,[usbvideo!IdleDetectWorkItem (00000001`c00095f0)]
+test    rax,rax
+je      usbvideo!PowerDownDevice+0x105 (00000001`c00097ed)
 
 usbvideo!PowerDownDevice+0xda:
-4c8bcb          mov     r9,rbx
-488983e8000000  mov     qword ptr [rbx+0E8h],rax
-41b801000000    mov     r8d,1
-c783d800000001000000 mov dword ptr [rbx+0D8h],1
-488bc8          mov     rcx,rax
-48ff156aaa0300  call    qword ptr [usbvideo!_imp_IoQueueWorkItem (00000001`c0044250)]
+mov     r9,rbx
+mov     qword ptr [rbx+0E8h],rax
+mov     r8d,1
+mov dword ptr [rbx+0D8h],1
+mov     rcx,rax
+call    qword ptr [usbvideo!_imp_IoQueueWorkItem (00000001`c0044250)]
 ```
 
 `IdleDetectWorkItem` call graph:
@@ -94,26 +96,76 @@ usbvideo!USBVideoFilterCreate [22]
 │                                                  ⟜usbvideo!_imp_KeAcquireSpinLockRaiseToDpc
 │                                                  ⟜usbvideo!_imp_KeReleaseSpinLock
 │                                                  usbvideo!RequestDxPowerIrp
-│                                                  usbvideo!WPP_SF_D
 │                            ⟜usbvideo!_imp_KsRemoveItemFromObjectBag
 ...
                              ⟜usbvideo!_imp_IoCsqInsertIrp
 ```
 
-Up to this point, we can infer the following:
+---
 
-* CreateFile powers up the device using *(IRP_MN_SET_POWER, PowerDeviceD0)*,
-adds the IRP to a *CSQ*.
-* CloseHandle schedules a *WorkItem*. The *WorkerRoutine* powers down the device
+We can infer the following:
+
+* IRP_MJ_CLOSE schedules a work item. The *IdleDetectWorkItem* powers down the device
 *(IRP_MN_SET_POWER, PowerDeviceD3)*.
+* IRP_MJ_CREATE powers up the device using *(IRP_MN_SET_POWER, PowerDeviceD0)*, adds the
+IRP to a *cancel-safe queue*. `usbvideo!USBVideoFilterCreate` propagates *STATUS_PENDING*.
 
-Since user mode receives STATUS_CANCELLED it is implied that somewhere in kernel, an
-instruction like `mov eax,0C0000120h` is executed. Looking for matches in the *usbvideo*
-reveals no results. Alternatively, there are matches for `mov [rdi+30h],0C0000120h`
-representing *Irp&#x2192;IoStatus.Status*, or for `mov edx,0C0000120h` passed as a
-2<sup>nd</sup> argument to an internal function.
+---
 
-After a few retries, this stack trace reveals the code path:
+Let's establish where *IRP_MJ_CREATE* is completed. *PowerUpDevice* calls
+*RequestDxPowerIrp*.
+
+```
+ usbvideo!RequestDxPowerIrp+0x42:
+ lea     r9,[usbvideo!PowerIrpCompletion (00000001`c0006950)]
+ ...
+ call    qword ptr [usbvideo!_imp_PoRequestPowerIrp (00000001`c0045230)]
+```
+
+`PowerIrpCompletion` itself schedules a work item:
+
+```
+usbvideo!PowerIrpCompletion+0x1cf:
+mov     r8d,1
+mov     r9,rdi
+call    qword ptr [usbvideo!_imp_IoQueueWorkItem (00000001`c0045278)]
+
+usbvideo!PowerIrpCompletion+0x313:
+mov     qword ptr [rdi+0F8h],rbx
+lea     rdx,[usbvideo!PassiveWakeup (00000001`c00065c0)]
+mov     rcx,rbx
+jmp     usbvideo!PowerIrpCompletion+0x1cf (00000001`c0006b1f)
+```
+
+`PassiveWakeup` call stack:
+
+```
+usbvideo!PassiveWakeup [25]
+│                     ⟜usbvideo!_imp_IoFreeWorkItem
+├────────────────────▷usbvideo!LoadPowerLineFrequency
+│                                                    usbvideo!GetDeviceRegValueDword
+│                                                    ⟜usbvideo!_imp_KsAcquireDevice
+│                                                    usbvideo!SubmitControlRequest
+│                                                    ⟜usbvideo!_imp_KsReleaseDevice
+├────────────────────▷usbvideo!LoadUVCCacheControl
+│                                                 usbvideo!GetDeviceRegValueDword
+│                                                 ⟜usbvideo!_imp_KsAcquireDevice
+│                                                 usbvideo!SubmitControlRequest
+│                                                 ⟜usbvideo!_imp_KsReleaseDevice
+└────────────────────▷usbvideo!FilterCreateQueue_CompleteQueue
+                                                              usbvideo!FilterCreateQueue_CompleteIrp
+                                                              ⟜usbvideo!_imp_IoCsqRemoveNextIrp
+                      ⟜usbvideo!_imp_IoReleaseRemoveLockEx
+```
+
+---
+
+Where in the kernel is STATUS_CANCELLED set? An instruction like `mov eax,0C0000120h`
+is implied. With an enhanced search criteria, 2 instances are revealed:
+* `mov [rdi+30h],0C0000120h` representing *Irp&#x2192;IoStatus.Status*
+* `mov edx,0C0000120h` is an argument to an internal function.
+
+After several attempts, this stack trace shows the code path:
 
 ```
 fffff807`79fbf61a ba200100c0      mov     edx,0C0000120h
@@ -154,34 +206,59 @@ Irp is active with 17 stacks 16 is current (= 0xffffc68925cea558)
 			Args: ffff9104460574d0 01000060 00000000 00000000
 ```
 
-And the call graph:
+`StopUSBVideoDevice` call graph:
 
 ```
-StopUSBVideoDevice [43]
-├─────────────────▷ExitIrpThreadAndQueue
-│                  │                     ⟜_imp_ExFreePoolWithTag
-│                  │                     ⟜_imp_IofCompleteRequest
-│                  │                     ⟜_imp_IoCsqRemoveNextIrp
-│                  ├────────────────────▷FilterCreateQueue_CompleteQueue
-│                  │                     └──────────────────────────────▷FilterCreateQueue_CompleteIrp
-│                  │                                                     ⟜_imp_IoCsqRemoveNextIrp
-│                  │                     ⟜_imp_KeReleaseSemaphore
+usbvideo!StopUSBVideoDevice [34]
+├─────────────────────────▷usbvideo!ExitIrpThreadAndQueue
+│                          │                             ⟜usbvideo!_imp_ExFreePoolWithTag
+│                          │                             ⟜usbvideo!_imp_IofCompleteRequest
+│                          │                             ⟜usbvideo!_imp_IoCsqRemoveNextIrp
+│                          ├────────────────────────────▷usbvideo!FilterCreateQueue_CompleteQueue
+│                          │                             ⟜usbvideo!_imp_KeReleaseSemaphore
 ...
-│                                        ⟜_imp_KeWaitForSingleObject
-│                                        ⟜_imp_ObfDereferenceObject
-└─────────────────▷UnConfigureUSBVideoDevice
-                   ├─────────────────────────▷USBVideoCallUSBD
-                   │                          │                ⟜_imp_KeInitializeEvent
-                   │                          │                ⟜_imp_IoBuildDeviceIoControlRequest
-                   │                          │                ⟜_imp_IoSetCompletionRoutineEx
-                   │                          │                ⟜_imp_IofCallDriver
-                   │                          │                ⟜_imp_KeWaitForSingleObject
+│                                                        ⟜usbvideo!_imp_KeWaitForSingleObject
+│                                                        ⟜usbvideo!_imp_ObfDereferenceObject
+└─────────────────────────▷usbvideo!UnConfigureUSBVideoDevice
+                           ├────────────────────────────────▷usbvideo!USBVideoCallUSBD
 ...
-                   │                                           ⟜_imp_IoCancelIrp
-                   │                                           ⟜_imp_IofCompleteRequest
 ```
 
+Conclusion
 ---
+1. *USBVideoFilterCreate* powers up the device inband, adds the IRP to a CSQ, returns *STATUS_PENDING*:
+    * *CompletionRoutine* schedules a *PassiveWakeup* work item.
+    * *PassiveWakeup* sets up the [*power frequency*](https://learn.microsoft.com/en-us/windows-hardware/drivers/stream/ksproperty-videoprocamp-powerline-frequency)
+or restores [*white balance*](https://learn.microsoft.com/en-us/windows-hardware/drivers/stream/camera-device-uvc-control-cache).
+It drains the IRPs in the CSQ with *STATUS_SUCCESS*.
+2. *USBVideoFilterClose* schedules a work item, IRP is resolved inband with *STATUS_SUCCESS*.
+    * *IdleDetectWorkItem* powers down the device.
+    * *StopUSBVideoDevice* calls *ExitIrpThreadAndQueue&#x2192;FilterCreateQueue_CompleteQueue(edx = 0xC0000120h)*
+    * *FilterCreateQueue_CompleteQueue* drains the CSQ with *STATUS_CANCELLED*.
 
-*StopUSBVideoDevice* calls *ExitIrpThreadAndQueue&#x2192;FilterCreateQueue_CompleteQueue(edx = 0xC0000120h)*.
-*FCQ_CQ* dequeues all *IRP*s from the cancel-safe queue and completes them.
+<details><summary>FilterCreateQueue_CompleteQueue drain loop</summary>
+
+```asm
+usbvideo!FilterCreateQueue_CompleteQueue+0x71:
+mov     r8d,edi
+mov     rdx,rbx
+call    usbvideo!FilterCreateQueue_CompleteIrp
+
+usbvideo!FilterCreateQueue_CompleteQueue+0x7c:
+xor     edx,edx
+mov     rcx,rsi
+mov     r10,qword ptr [usbvideo!_imp_IoCsqRemoveNextIrp]
+call    nt!IoCsqRemoveNextIrp
+mov     rbx,rax
+test    rax,rax
+jne     usbvideo!FilterCreateQueue_CompleteQueue+0x1a Branch
+
+usbvideo!FilterCreateQueue_CompleteQueue+0x95:
+mov     rbx,qword ptr [rsp+40h]
+mov     rsi,qword ptr [rsp+48h]
+add     rsp,30h
+pop     rdi
+ret
+```
+
+</details>
