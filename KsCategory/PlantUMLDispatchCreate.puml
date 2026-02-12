@@ -1,0 +1,49 @@
+@startuml
+
+skinparam RoundCorner 4
+
+participant "IoManager" as A #F3F3F3
+actor UsbVideo as B #black
+participant UsbCcgp as C #F3F3F3
+
+A -> B : DispatchCreate
+activate A
+activate B
+B -> C : PoRequestPowerIrp(DeviceD0, PowerIrpCompletion)
+activate C
+C -> A : EnqueuePowerIrp
+activate A
+deactivate A
+C --> B : STATUS_PENDING
+deactivate C
+B -> B : IoCsqInsertIrp
+B --> A : STATUS_PENDING
+deactivate B
+deactivate A
+
+C -> B : IoCompleteRequest
+activate C
+B -> B: PowerIrpCompletion
+activate B
+B -> A : IoQueueWorkItem(PassiveWakeup)
+deactivate B
+deactivate C
+...
+A ->> B: PassiveWakeup
+activate B #lightblue
+B -> C: LoadPowerLineFrequency
+B -> C: LoadUVCCacheControl
+...
+B -> B: FilterCreateQueue_CompleteQueue
+loop Drain CSQ
+activate B #black
+B -> B: IoCsqRemoveNextIrp
+B --> B: Irp→IoStatus = STATUS_SUCCESS
+B -> A: IoCompleteRequest
+activate B #lightgreen
+deactivate B
+end
+deactivate B
+deactivate B
+
+@enduml

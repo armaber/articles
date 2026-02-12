@@ -1,0 +1,53 @@
+@startuml
+skinparam RoundCorner 4
+
+participant "IoManager" as A #F3F3F3
+actor UsbVideo as B #black
+participant "UsbCcgp" as C #F3F3F3
+
+A -> B : DispatchClose
+activate A
+activate B
+B -> B : PowerDownDevice
+activate B
+B -> A : IoQueueWorkItem(IdleDetectWorkItem)
+deactivate B
+B --> A : STATUS_SUCCESS
+deactivate B
+deactivate A
+...
+A ->> B : IdleDetectWorkItem
+activate B
+B -> C: PoRequestPowerIrp(DeviceD3)
+activate C
+C -> A: EnqueuePowerIrp
+activate A
+deactivate A
+C --> B : STATUS_PENDING
+deactivate C
+deactivate B
+...
+A -> A : DequeuePowerIrp
+activate A
+A -> B : DispatchPower(DeviceD3)
+activate B
+B -> B : StopUSBVideoDevice
+activate B #lightblue
+B -> B: FilterCreateQueue_CompleteQueue
+loop Drain CSQ
+note right
+IRPs inserted by
+DispatchCreate
+end note
+activate B #black
+B -> B: IoCsqRemoveNextIrp
+B --> B: Irp→IoStatus = STATUS_CANCELLED
+B -> A: IoCompleteRequest
+activate B #red
+deactivate B
+end
+deactivate B
+deactivate B
+deactivate B
+deactivate A
+@enduml

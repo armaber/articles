@@ -262,3 +262,5 @@ ret
 ```
 
 </details>
+
+![UML diagram for DispatchCreate, DispatchClose](./CreateCloseSideBySide.png)
