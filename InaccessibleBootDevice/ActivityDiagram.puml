@@ -1,0 +1,19 @@
+@startuml
+title PnpBootDeviceWait() activity
+
+start
+
+repeat
+  :status = IopMarkBootPartition(LoaderBlock);
+  if (NT_SUCCESS(status)) then (yes)
+    stop;<<#green>>
+  else (no)
+    :KeDelayExecutionThread(200ms);
+    :PollBootPartitionTimeout -= 200ms;
+  endif
+repeat while (PollBootPartitionTimeout >= 0) is (yes) not (no)
+
+:KeBugCheckEx(0x7B);
+stop;<<#red>>
+
+@enduml

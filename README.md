@@ -1,5 +1,5 @@
-The articles are written as lightweight lunch discussions, with emphasys on accesibility.
-To some degree, one has to be versed in techology and focus on what is relevant.
+The articles are written as lightweight lunch discussions, with emphasis on accessibility.
+To some degree, one has to be versed in technology and focus on what is relevant.
 
 Many of the topics dive into Windows, as an OS: infrastructure, kernel, features,
 or tools.
@@ -24,6 +24,8 @@ CTL_CODE values from command line.
 calls below FDOs on PCI eXpress.
 - [KsCategory](./KsCategory/cancelled.md): CloseHandle for KSCATEGORY_VIDEO_CAMERA is
 multiplexed in kernel mode.
+- [Review7B](./InaccessibleBootDevice/notes.md): trap INACCESSIBLE_BOOT_DEVICE bugcheck,
+preserve the indicators in EFI.
 
 Preparation:
 - [IFR](./KmdfLogging/notes.md): enable KMDF logs for analysis.
